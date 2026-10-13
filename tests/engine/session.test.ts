@@ -148,4 +148,69 @@ describe('PracticeSession: A–B loop', () => {
     s.setLoop(null, 3000);
     expect(s.getState()).toMatchObject({ songTime: 2.5, loop: null });
   });
+
+  it('seeking outside an active loop jumps to the loop restart', () => {
+    const s = new PracticeSession([pn(60, 0, 8)], MEASURES, config({ loop: { startMeasure: 1, endMeasure: 1 } }), 0);
+    s.seek(6, 0);
+    expect(s.getState()).toMatchObject({ songTime: 0, loopPass: 0 });
+    s.seek(3, 0);
+    expect(s.getState().songTime).toBe(3);
+  });
+
+  it('setting a loop on a finished run starts playing again at its restart', () => {
+    const s = new PracticeSession([pn(60, 0, 1)], MEASURES, config(), 0);
+    s.tick(10_000);
+    expect(s.getState().status).toBe('finished');
+    s.setLoop({ startMeasure: 0, endMeasure: 3 }, 10_000);
+    expect(s.getState()).toMatchObject({ status: 'playing', songTime: -2 });
+  });
+
+  it('getState returns a copy of the score', () => {
+    const s = new PracticeSession([pn(60, 0, 1)], MEASURES, config({ practice: 'right' }), 0);
+    const score = s.getState().score!;
+    expect(s.getState().score).not.toBe(score);
+    expect(s.getState().score).toEqual(score);
+  });
+});
+
+describe('PracticeSession: loop edges', () => {
+  const loop = { startMeasure: 1, endMeasure: 1 };
+
+  it('tempo: keeps judging after B so a late press still hits, and plays nothing past B', () => {
+    const notes = [pn(60, 3.95, 0.05, 'right'), pn(48, 4.05, 0.5, 'left')];
+    const s = new PracticeSession(notes, MEASURES, config({ practice: 'right', loop }), 0);
+    s.tick(4120);
+    s.noteOn(60, 0.8, 4050);
+    expect(s.getState().pressed.get(60)).toBe('right');
+    expect(s.drainOutput().some((e) => e.type === 'noteOn' && e.pitch === 48)).toBe(false);
+    s.tick(4300);
+    const state = s.getState();
+    expect(state.loopPass).toBe(1);
+    expect(state.lastLoopScore).toMatchObject({ kind: 'tempo', hits: 1, misses: 0, extras: 0 });
+    expect(state.score).toMatchObject({ hits: 0, misses: 0, extras: 0 });
+  });
+
+  it('wait: a press during the lead-in is neutral and does not spoil the first step', () => {
+    const s = new PracticeSession(
+      [pn(64, 2.5, 0.5)],
+      MEASURES,
+      config({ mode: 'wait', practice: 'right', loop }),
+      0,
+    );
+    s.tick(1000);
+    s.noteOn(64, 0.8, 1000);
+    expect(s.getState().pressed.get(64)).toBe('neutral');
+    s.noteOff(64, 1100);
+    s.tick(2600);
+    s.noteOn(64, 0.8, 2600);
+    expect(s.getState().score).toMatchObject({ wrongNotes: 0, cleanSteps: 1 });
+  });
+
+  it('tempo: a press during the lead-in is neutral and counts no extra', () => {
+    const s = new PracticeSession([pn(64, 2.5, 0.5)], MEASURES, config({ practice: 'right', loop }), 0);
+    s.tick(1000);
+    s.noteOn(64, 0.8, 1000);
+    expect(s.getState().pressed.get(64)).toBe('neutral');
+    expect(s.getState().score).toMatchObject({ extras: 0 });
+  });
 });

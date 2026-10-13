@@ -83,4 +83,12 @@ describe('tempo mode', () => {
     expect(state.score).toMatchObject({ hits: 1, misses: 3 });
     expect(scorePercent(state.score!)).toBe(25);
   });
+
+  it('at half speed a press 200 ms late is outside the scaled window', () => {
+    const s = tempoSession([pn(60, 0, 1)], 0.5);
+    s.tick(2200);
+    s.noteOn(60, 0.8, 2200);
+    expect(s.getState().pressed.get(60)).toBe('wrong');
+    expect(s.getState().score).toMatchObject({ hits: 0, extras: 1 });
+  });
 });

@@ -1,6 +1,6 @@
 import type { PlayableNote, PlayRole } from '../song/types';
 import { AutoPlayer } from './auto-player';
-import { TempoJudge } from './tempo-judge';
+import { HIT_WINDOW_SECONDS, MISS_GRACE_SECONDS, TempoJudge } from './tempo-judge';
 import type {
   KeyResult,
   LoopRange,
@@ -11,7 +11,7 @@ import type {
   SessionState,
   Status,
 } from './types';
-import { WaitJudge } from './wait-judge';
+import { EARLY_PRESS_SECONDS, WaitJudge } from './wait-judge';
 
 /** Real seconds of falling notes before the first note of the song. */
 export const LEAD_IN_SECONDS = 2;
@@ -106,6 +106,12 @@ export class PracticeSession {
     const lagSeconds = Math.max(0, this.lastWallMs - timeMs) / 1000;
     const waiting = this.status === 'waiting';
     const eventTime = waiting ? this.songTime : this.songTime - lagSeconds * this.config.speed;
+    const loop = this.loopBounds();
+    const tolerance = (this.wait ? EARLY_PRESS_SECONDS : HIT_WINDOW_SECONDS) * this.config.speed;
+    if (loop && eventTime < loop.start - tolerance) {
+      this.pressed.set(pitch, 'neutral');
+      return;
+    }
     let result: KeyResult;
     if (this.wait) {
       const secondsUntilStep = Math.max(0, (this.wait.holdTime - eventTime) / this.config.speed);
@@ -142,7 +148,10 @@ export class PracticeSession {
     this.tick(nowMs);
     this.lastWallMs = nowMs;
     this.pristine = false;
-    this.jumpTo(Math.min(this.endTime, Math.max(Math.min(0, this.startTime), t)));
+    let target = Math.min(this.endTime, Math.max(Math.min(0, this.startTime), t));
+    const loop = this.loopBounds();
+    if (loop && (target < loop.restart || target >= loop.end)) target = loop.restart;
+    this.jumpTo(target);
   }
 
   setSpeed(speed: number, nowMs: number): void {
@@ -156,7 +165,7 @@ export class PracticeSession {
     this.config.loop = loop;
     this.pristine = false;
     const bounds = this.loopBounds();
-    if (bounds && (this.songTime < bounds.restart || this.songTime >= bounds.end)) {
+    if (bounds && (this.status === 'finished' || this.songTime < bounds.restart || this.songTime >= bounds.end)) {
       this.jumpTo(bounds.restart);
     } else {
       this.resetJudges(this.songTime);
@@ -182,7 +191,7 @@ export class PracticeSession {
       loop: this.config.loop,
       pressed: new Map(this.pressed),
       expected: new Set(this.status === 'waiting' && this.wait ? this.wait.pending : []),
-      score: this.wait?.score ?? this.tempo?.score ?? null,
+      score: this.currentScore(),
       loopPass: this.loopPass,
       lastLoopScore: this.lastLoopScore,
       complete: this.pristine && this.status === 'finished',
@@ -207,12 +216,13 @@ export class PracticeSession {
       return;
     }
     const loop = this.loopBounds();
-    if (loop && target >= loop.end) {
-      this.moveTo(loop.end);
+    // Tempo mode keeps judging for the late half of the hit window past B.
+    const tail = this.tempo ? (HIT_WINDOW_SECONDS + MISS_GRACE_SECONDS) * this.config.speed : 0;
+    if (loop && target >= loop.end + tail) {
+      this.moveTo(loop.end + tail);
       this.tempo?.finalize();
       this.loopPass++;
-      const score = this.wait?.score ?? this.tempo?.score ?? null;
-      this.lastLoopScore = score ? { ...score } : null;
+      this.lastLoopScore = this.currentScore();
       this.jumpTo(loop.restart);
       return;
     }
@@ -227,9 +237,15 @@ export class PracticeSession {
     this.moveTo(target);
   }
 
+  private currentScore(): Score | null {
+    const score = this.wait?.score ?? this.tempo?.score ?? null;
+    return score ? { ...score } : null;
+  }
+
   private moveTo(t: number): void {
     const audible = this.audible;
-    this.auto.advanceTo(t, this.config.volume, (e) => {
+    const loop = this.loopBounds();
+    this.auto.advanceTo(loop ? Math.min(t, loop.end) : t, this.config.volume, (e) => {
       if (audible) this.out.push(e);
     });
     this.tempo?.advanceTo(t, this.config.speed);

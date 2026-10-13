@@ -116,4 +116,25 @@ describe('wait mode', () => {
     expect(state).toMatchObject({ status: 'finished', complete: true });
     expect(scorePercent(state.score!)).toBe(50);
   });
+
+  it('the early-press tolerance is real time: at half speed 90 ms early counts, 150 ms is wrong', () => {
+    const ok = new PracticeSession(
+      [pn(60, 0, 1)],
+      MEASURES,
+      { mode: 'wait', practice: 'right', speed: 0.5, loop: null, soundOn: true, volume: 1 },
+      0,
+    );
+    ok.tick(1910);
+    ok.noteOn(60, 0.8, 1910);
+    expect(ok.getState().pressed.get(60)).toBe('right');
+    const bad = new PracticeSession(
+      [pn(60, 0, 1)],
+      MEASURES,
+      { mode: 'wait', practice: 'right', speed: 0.5, loop: null, soundOn: true, volume: 1 },
+      0,
+    );
+    bad.tick(1850);
+    bad.noteOn(60, 0.8, 1850);
+    expect(bad.getState().pressed.get(60)).toBe('wrong');
+  });
 });
