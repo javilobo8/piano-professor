@@ -1,0 +1,20 @@
+/** The play area is always dark, Synthesia-style. */
+export const COLORS = {
+  background: '#12141a',
+  blackLane: '#0e1015',
+  measureLine: 'rgba(255, 255, 255, 0.08)',
+  loopShade: 'rgba(232, 195, 90, 0.07)',
+  hitLine: '#e8c35a',
+  right: '#4cc36a',
+  rightDark: '#2f8f4a',
+  left: '#3d8bfd',
+  leftDark: '#2a62c0',
+  accompaniment: '#6b7280',
+  wrong: '#ef4444',
+  neutral: '#a78bfa',
+  expected: 'rgba(250, 204, 21, 0.6)',
+  whiteKey: '#f4f4f5',
+  whiteKeyEdge: '#9ca3af',
+  blackKey: '#1c1c22',
+  label: 'rgba(255, 255, 255, 0.85)',
+} as const;
