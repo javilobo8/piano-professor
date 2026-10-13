@@ -19,6 +19,8 @@ export class BleMidiConnection implements MidiConnection {
   private disconnectListeners = new Set<() => void>();
   private encoder = new MidiOutputEncoder();
   private writes: Promise<unknown> = Promise.resolve();
+  /** Messages sent in the current task, written together from one microtask. */
+  private pending: number[][] = [];
   private closed = false;
   private reconnecting = false;
 
@@ -57,16 +59,12 @@ export class BleMidiConnection implements MidiConnection {
   }
 
   send(event: OutputEvent): void {
-    const characteristic = this.characteristic;
-    if (!characteristic) return;
+    if (!this.characteristic) return;
     const messages = this.encoder.encode(event);
-    for (let i = 0; i < messages.length; i += MESSAGES_PER_PACKET) {
-      const packet = encodeBlePacket(messages.slice(i, i + MESSAGES_PER_PACKET), performance.now());
-      // GATT allows one operation at a time: queue the writes.
-      this.writes = this.writes
-        .then(() => characteristic.writeValueWithoutResponse(packet))
-        .catch(() => undefined);
-    }
+    if (messages.length === 0) return;
+    // Coalesce everything sent in this task (e.g. a chord) into as few packets as possible.
+    if (this.pending.length === 0) queueMicrotask(this.flushPending);
+    this.pending.push(...messages);
   }
 
   close(): void {
@@ -87,6 +85,21 @@ export class BleMidiConnection implements MidiConnection {
     await characteristic.startNotifications();
     this.characteristic = characteristic;
   }
+
+  private flushPending = (): void => {
+    const messages = this.pending;
+    this.pending = [];
+    const characteristic = this.characteristic;
+    if (!characteristic) return;
+    const now = performance.now();
+    for (let i = 0; i < messages.length; i += MESSAGES_PER_PACKET) {
+      const packet = encodeBlePacket(messages.slice(i, i + MESSAGES_PER_PACKET), now);
+      // GATT allows one operation at a time: queue the writes.
+      this.writes = this.writes
+        .then(() => characteristic.writeValueWithoutResponse(packet))
+        .catch(() => undefined);
+    }
+  };
 
   private handleValue = (event: Event): void => {
     const value = (event.target as BluetoothRemoteGATTCharacteristic).value;

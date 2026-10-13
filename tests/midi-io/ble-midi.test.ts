@@ -85,16 +85,48 @@ describe('BleMidiConnection', () => {
     ]);
   });
 
-  it('writes output as BLE-MIDI packets, one write at a time', async () => {
+  it('writes output as BLE-MIDI packets of up to 4 messages, one write at a time', async () => {
     const { device, connection } = await open();
     for (const pitch of [60, 61, 62, 63, 64]) connection.send({ type: 'noteOn', pitch, velocity: 90 });
     connection.send({ type: 'allNotesOff' });
     await vi.advanceTimersByTimeAsync(100);
     const messages = device.characteristic.writes.map((w) => decodeBlePacket(w));
-    // 5 note-ons (1 packet each), then 5 note-offs + all-notes-off CC = 6 messages split 4 + 2.
-    expect(messages.map((m) => m.length)).toEqual([1, 1, 1, 1, 1, 4, 2]);
-    expect(messages[0]).toEqual([[0x90, 60, 90]]);
-    expect(messages.slice(5).flat().map(([status]) => status & 0xf0)).toEqual([0x80, 0x80, 0x80, 0x80, 0x80, 0xb0]);
+    // 5 note-ons + 5 note-offs + all-notes-off CC = 11 messages sent in one task: split 4 + 4 + 3.
+    expect(messages.map((m) => m.length)).toEqual([4, 4, 3]);
+    expect(messages[0]).toEqual([
+      [0x90, 60, 90],
+      [0x90, 61, 90],
+      [0x90, 62, 90],
+      [0x90, 63, 90],
+    ]);
+    expect(messages.flat().slice(5).map(([status]) => status & 0xf0)).toEqual([0x80, 0x80, 0x80, 0x80, 0x80, 0xb0]);
+    expect(device.characteristic.maxInFlight).toBe(1);
+  });
+
+  it('coalesces the messages sent in one task into one packet', async () => {
+    const { device, connection } = await open();
+    connection.send({ type: 'noteOn', pitch: 60, velocity: 90 });
+    connection.send({ type: 'noteOn', pitch: 64, velocity: 80 });
+    connection.send({ type: 'noteOff', pitch: 55 });
+    expect(device.characteristic.writes).toHaveLength(0);
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(device.characteristic.writes.map((w) => decodeBlePacket(w))).toEqual([
+      [
+        [0x90, 60, 90],
+        [0x90, 64, 80],
+        [0x80, 55, 0],
+      ],
+    ]);
+  });
+
+  it('messages sent after a flush go in their own packet, after the previous write', async () => {
+    const { device, connection } = await open();
+    connection.send({ type: 'noteOn', pitch: 60, velocity: 90 });
+    await Promise.resolve();
+    connection.send({ type: 'noteOff', pitch: 60 });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(device.characteristic.writes.map((w) => decodeBlePacket(w))).toEqual([[[0x90, 60, 90]], [[0x80, 60, 0]]]);
     expect(device.characteristic.maxInFlight).toBe(1);
   });
 
