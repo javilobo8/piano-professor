@@ -64,7 +64,8 @@ ui (Svelte) orquesta pantallas y conecta los módulos.
 src/
   midi-io/   types.ts  web-midi.ts  ble-midi.ts  ble-packet.ts  connection-manager.ts
   song/      types.ts  parse.ts  hands.ts  steps.ts
-  engine/    types.ts  session.ts  wait-mode.ts  tempo-mode.ts  output.ts  scoring.ts
+  engine/    types.ts  session.ts  wait-judge.ts  tempo-judge.ts  auto-player.ts  scoring.ts
+  util/      bisect.ts
   render/    renderer.ts  keyboard-layout.ts  colors.ts
   storage/   db.ts  songs.ts  scores.ts  settings.ts
   i18n/      index.ts  en.ts  es.ts
@@ -94,17 +95,16 @@ interface SongNote {
   end: number;
   velocity: number;   // 0–1
   track: number;
-  channel: number;
 }
-interface TrackInfo { index: number; name: string; channels: number[]; noteCount: number; avgPitch: number; }
+interface TrackInfo { index: number; name: string; channel: number; noteCount: number; avgPitch: number; }
 interface Song { title: string; duration: number; notes: SongNote[]; tracks: TrackInfo[]; measures: number[]; }
-//   notes ordenadas por start; measures = inicio (s) de cada compás
+//   notes ordenadas por start; measures = fronteras de compás (s): measures[0] = 0,
+//   el compás i va de measures[i] a measures[i+1], y el último valor ≥ duration
 
 type Role = 'right' | 'left' | 'accompaniment' | 'ignore';
 interface HandConfig {
-  method: 'tracks' | 'channels' | 'split';
+  method: 'tracks' | 'split';
   trackRoles: Record<number, Role>;     // method 'tracks'
-  channelRoles: Record<number, Role>;   // method 'channels'
   splitPitch: number;                   // method 'split', defecto 60 (Do central)
 }
 interface PlayableNote extends SongNote { role: 'right' | 'left' | 'accompaniment'; }
@@ -114,8 +114,11 @@ interface PlayableNote extends SongNote { role: 'right' | 'left' | 'accompanimen
 
 - `@tonejs/midi` → notas en segundos (respeta el mapa de tempos) y compases (`timeSignatures`).
   Si el MIDI no trae compás, se asume 4/4.
-- Se descartan las notas del canal 10 (percusión) y las pistas sin notas.
-- Título: el nombre del MIDI si existe, si no el nombre del archivo sin extensión.
+- `@tonejs/midi` ya separa cada pista del archivo en una pista por (canal, instrumento), así
+  que una pista única con dos canales llega como dos pistas: no hace falta un método por canal.
+- Se descartan las notas del canal 10 (percusión), las notas fuera del rango del piano
+  (21–108) y las pistas sin notas.
+- Título: el nombre del archivo sin extensión (renombrable en la biblioteca).
 
 ### Asignación automática de manos (`hands.ts`)
 
@@ -123,9 +126,10 @@ interface PlayableNote extends SongNote { role: 'right' | 'left' | 'accompanimen
    `right|rh|derecha|treble|mano d` → derecha; `left|lh|izquierda|bass|mano i` → izquierda.
    Si el nombre no resuelve las dos manos: de las dos pistas con más notas, la de
    `avgPitch` mayor es derecha y la otra izquierda. El resto de pistas → acompañamiento.
-2. **1 pista con notas en 2+ canales → `channels`.** Mismo criterio por altura media entre
-   los dos canales con más notas; el resto → acompañamiento.
-3. **1 pista con 1 canal → `split`.** `pitch >= splitPitch` → derecha, si no izquierda.
+2. **1 pista → `split`.** `pitch >= splitPitch` → derecha, si no izquierda.
+
+En modo `split` todas las notas de todas las pistas se reparten por altura; los roles de
+pista no se usan. La pantalla de preparar permite cambiar entre `tracks` y `split`.
 
 El usuario puede cambiar todo en "Preparar canción"; su elección se guarda con la canción.
 
@@ -203,8 +207,8 @@ teclas pulsadas con su resultado (`correct-right | correct-left | wrong`), tecla
 
 ### Común
 
-- **Entrada inicial:** el tiempo arranca 2 s (reales) antes de la primera nota requerida
-  (o de la primera nota si `practice = 'none'`).
+- **Entrada inicial:** el tiempo arranca 2 s (reales) antes de la primera nota de la
+  canción (de cualquier mano), para oír la introducción.
 - **Velocidad:** 25 %–150 % en pasos de 5 %. Cambiarla en marcha no salta el tiempo.
 - **Bucle A–B:** compases indexados desde 0, ambos inclusive. Al llegar al final del
   compás B (`measures[B+1]`, o fin de canción si B es el último), salto al inicio del
@@ -283,9 +287,10 @@ Horizontal, pantalla completa (PWA), Wake Lock activo en la pantalla de tocar.
 2. **Song setup** — rol de cada pista (con botón de escuchar la pista) o deslizador de
    punto de corte; mano (R / L / Both), modo (Wait / Tempo), velocidad, sonido y volumen,
    "Listen" (el piano toca la canción entera), "Start".
-3. **Play** — barra superior (volver, pausa, progreso con compases y marcadores A–B
-   arrastrables, tiempo, velocidad, cambio rápido de mano, conexión); cascada de notas;
-   teclado.
+3. **Play** — barra superior (volver, pausa, progreso con compases y zona A–B marcada,
+   tiempo, velocidad, cambio rápido de mano, conexión); cascada de notas; teclado.
+   El bucle A–B se activa con un botón y sus compases se ajustan con botones −/+ (más
+   cómodos en pantalla táctil que arrastrar marcadores).
 4. **Results** — superpuesta: marca de la partida, mejor marca, "Retry" / "Back".
 5. **Settings** — idioma, nombres de notas, conexión (USB/BLE, elegir dispositivo),
    volumen, mostrar acompañamiento, rango de teclado, nombres sobre las notas.
@@ -313,7 +318,7 @@ Horizontal, pantalla completa (PWA), Wake Lock activo en la pantalla de tocar.
 
 - **IndexedDB** (`idb`), base `piano-professor` v1:
   - `songs` — clave `id` (UUID): `{ id, title, fileName, bytes: ArrayBuffer, addedAt,
-    handConfig }`.
+    duration, handConfig }`.
   - `scores` — clave `[songId, practice, mode]`: `{ best: Result, history: Result[] (≤10) }`,
     `Result = { date, speed, ...métricas del modo }`. "Mejor" = mayor % principal
     (pasos limpios en espera, precisión en tempo).
