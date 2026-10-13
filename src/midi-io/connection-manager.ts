@@ -133,13 +133,16 @@ export class ConnectionManager {
     try {
       this.attach(await this.requestBle());
     } catch (e) {
-      const cancelled = e instanceof DOMException && e.name === 'NotFoundError';
+      // Chrome rejects NotFoundError both for a dismissed chooser and for a switched-off adapter.
+      const notFound = e instanceof DOMException && e.name === 'NotFoundError';
+      const adapterOff = notFound && /adapter/i.test(e.message);
+      const cancelled = notFound && !adapterOff;
       if (this.active) {
         this.setStatus(previous);
       } else {
         const error: ConnectionError | null = cancelled
           ? null
-          : e instanceof BluetoothUnavailableError
+          : adapterOff || e instanceof BluetoothUnavailableError
             ? 'bluetooth-unsupported'
             : 'bluetooth-failed';
         this.setStatus({ state: 'disconnected', error });

@@ -154,14 +154,30 @@ describe('ConnectionManager over Bluetooth', () => {
   it('connects on request and forwards notes', async () => {
     const ble = fakeBle();
     const manager = new ConnectionManager({ requestBle: async () => ble });
+    const statuses: ConnectionStatus[] = [];
+    manager.subscribe((s) => statuses.push(s));
     const notes: NoteEvent[] = [];
     manager.onNote((e) => notes.push(e));
     await manager.connectBluetooth();
+    expect(statuses).toEqual([
+      { state: 'disconnected', error: null },
+      { state: 'connecting', kind: 'ble' },
+      { state: 'connected', kind: 'ble', name: 'FP-10 BLE' },
+    ]);
     expect(manager.current).toEqual({ state: 'connected', kind: 'ble', name: 'FP-10 BLE' });
     ble.emit({ type: 'on', pitch: 62, velocity: 0.5, timeMs: 1 });
     expect(notes).toHaveLength(1);
     ble.drop();
+    expect(ble.close).toHaveBeenCalledTimes(1);
     expect(manager.current).toEqual({ state: 'disconnected', error: null });
+  });
+
+  it('reports a switched-off Bluetooth adapter instead of a silent cancel', async () => {
+    const manager = new ConnectionManager({
+      requestBle: () => Promise.reject(new DOMException('Bluetooth adapter not available.', 'NotFoundError')),
+    });
+    await manager.connectBluetooth();
+    expect(manager.current).toEqual({ state: 'disconnected', error: 'bluetooth-unsupported' });
   });
 
   it('shows no error when the user cancels the chooser', async () => {

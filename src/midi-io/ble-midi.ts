@@ -20,6 +20,7 @@ export class BleMidiConnection implements MidiConnection {
   private encoder = new MidiOutputEncoder();
   private writes: Promise<unknown> = Promise.resolve();
   private closed = false;
+  private reconnecting = false;
 
   private constructor(private readonly device: BluetoothDevice) {}
 
@@ -27,7 +28,12 @@ export class BleMidiConnection implements MidiConnection {
   static async request(bluetooth: Bluetooth): Promise<BleMidiConnection> {
     const device = await bluetooth.requestDevice({ filters: [{ services: [BLE_MIDI_SERVICE] }] });
     const connection = new BleMidiConnection(device);
-    await connection.connect();
+    try {
+      await connection.connect();
+    } catch (e) {
+      device.gatt?.disconnect();
+      throw e;
+    }
     device.addEventListener('gattserverdisconnected', connection.handleDisconnect);
     return connection;
   }
@@ -94,18 +100,23 @@ export class BleMidiConnection implements MidiConnection {
   };
 
   private handleDisconnect = async (): Promise<void> => {
-    if (this.closed) return;
-    this.characteristic?.removeEventListener('characteristicvaluechanged', this.handleValue);
-    this.characteristic = null;
-    for (const delay of RECONNECT_DELAYS_MS) {
-      await new Promise((resolve) => setTimeout(resolve, delay));
-      if (this.closed) return;
-      try {
-        await this.connect();
-        return;
-      } catch {
-        // Try again after the next delay.
+    if (this.closed || this.reconnecting) return;
+    this.reconnecting = true;
+    try {
+      this.characteristic?.removeEventListener('characteristicvaluechanged', this.handleValue);
+      this.characteristic = null;
+      for (const delay of RECONNECT_DELAYS_MS) {
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        if (this.closed) return;
+        try {
+          await this.connect();
+          return;
+        } catch {
+          // Try again after the next delay.
+        }
       }
+    } finally {
+      this.reconnecting = false;
     }
     for (const cb of [...this.disconnectListeners]) cb();
   };
