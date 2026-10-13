@@ -213,4 +213,26 @@ describe('PracticeSession: loop edges', () => {
     expect(s.getState().pressed.get(64)).toBe('neutral');
     expect(s.getState().score).toMatchObject({ extras: 0 });
   });
+
+  it('tempo: never starts an auto note at B, but still ends notes inside the loop on time', () => {
+    const notes = [pn(64, 2.5, 0.2, 'right'), pn(50, 3, 0.9, 'left'), pn(48, 4, 0.5, 'left')];
+    const s = new PracticeSession(notes, MEASURES, config({ practice: 'right', loop }), 0);
+    s.tick(3950);
+    expect(s.drainOutput()).toContainEqual({ type: 'noteOff', pitch: 50 });
+    s.tick(4100);
+    expect(s.drainOutput().some((e) => e.type === 'noteOn' && e.pitch === 48)).toBe(false);
+    s.tick(4300);
+    expect(s.getState().loopPass).toBe(1);
+    expect(s.drainOutput().some((e) => e.type === 'noteOn' && e.pitch === 48)).toBe(false);
+  });
+
+  it('clearing the loop during the tail does not burst the notes skipped past B', () => {
+    const notes = [pn(64, 2.5, 0.2, 'right'), pn(55, 4.05, 0.1, 'left')];
+    const s = new PracticeSession(notes, MEASURES, config({ practice: 'right', loop }), 0);
+    s.tick(4100);
+    s.drainOutput();
+    s.setLoop(null, 4100);
+    s.tick(4120);
+    expect(s.drainOutput().some((e) => e.type === 'noteOn')).toBe(false);
+  });
 });

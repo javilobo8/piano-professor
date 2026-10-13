@@ -65,6 +65,8 @@ export class PracticeSession {
   private loopPass = 0;
   private lastLoopScore: Score | null = null;
   private pristine = true;
+  /** Song time up to which the auto player has been advanced. */
+  private autoTime = 0;
 
   constructor(
     notes: readonly PlayableNote[],
@@ -168,6 +170,12 @@ export class PracticeSession {
     if (bounds && (this.status === 'finished' || this.songTime < bounds.restart || this.songTime >= bounds.end)) {
       this.jumpTo(bounds.restart);
     } else {
+      if (this.songTime > this.autoTime) {
+        // Left the old loop's tail: skip what was held back instead of playing it all at once.
+        this.autoTime = this.songTime;
+        this.auto.reset(this.songTime);
+        this.out.push({ type: 'allNotesOff' });
+      }
       this.resetJudges(this.songTime);
       if (this.status === 'waiting') this.status = 'playing';
     }
@@ -245,15 +253,23 @@ export class PracticeSession {
   private moveTo(t: number): void {
     const audible = this.audible;
     const loop = this.loopBounds();
-    this.auto.advanceTo(loop ? Math.min(t, loop.end) : t, this.config.volume, (e) => {
-      if (audible) this.out.push(e);
-    });
+    const autoTarget = loop ? Math.min(t, loop.end) : t;
+    this.auto.advanceTo(
+      autoTarget,
+      this.config.volume,
+      (e) => {
+        if (audible) this.out.push(e);
+      },
+      loop ? loop.end : Infinity,
+    );
+    this.autoTime = Math.max(this.autoTime, autoTarget);
     this.tempo?.advanceTo(t, this.config.speed);
     this.songTime = t;
   }
 
   private jumpTo(t: number): void {
     this.songTime = t;
+    this.autoTime = t;
     this.auto.reset(t);
     this.out.push({ type: 'allNotesOff' });
     this.resetJudges(t);

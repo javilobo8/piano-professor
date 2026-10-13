@@ -22,11 +22,14 @@ export class AutoPlayer {
     this.counts.clear();
   }
 
-  /** Emits every note start/end up to and including song time t, in time order. */
-  advanceTo(t: number, volume: number, emit: (e: OutputEvent) => void): void {
+  /**
+   * Emits every note start/end up to and including song time t, in time order.
+   * Notes starting at or after `startLimit` (exclusive) are not started yet.
+   */
+  advanceTo(t: number, volume: number, emit: (e: OutputEvent) => void, startLimit = Infinity): void {
     for (;;) {
       const startNote = this.next < this.notes.length ? this.notes[this.next] : null;
-      const startTime = startNote ? startNote.start : Infinity;
+      const startTime = startNote && startNote.start < startLimit ? startNote.start : Infinity;
       const endIndex = this.earliestEnd();
       const endTime = endIndex >= 0 ? this.sounding[endIndex].end : Infinity;
       if (Math.min(startTime, endTime) > t) return;
