@@ -1,0 +1,266 @@
+import type { PlayableNote, PlayRole } from '../song/types';
+import { AutoPlayer } from './auto-player';
+import { TempoJudge } from './tempo-judge';
+import type {
+  KeyResult,
+  LoopRange,
+  OutputEvent,
+  Practice,
+  Score,
+  SessionConfig,
+  SessionState,
+  Status,
+} from './types';
+import { WaitJudge } from './wait-judge';
+
+/** Real seconds of falling notes before the first note of the song. */
+export const LEAD_IN_SECONDS = 2;
+/** Song seconds after the last note ends before the session finishes. */
+export const END_PADDING_SECONDS = 1;
+export const MIN_SPEED = 0.25;
+export const MAX_SPEED = 1.5;
+
+interface LoopBounds {
+  start: number;
+  end: number;
+  /** Where each pass restarts: one measure before `start`. */
+  restart: number;
+}
+
+export function practicedRoles(practice: Practice): Set<PlayRole> {
+  switch (practice) {
+    case 'right':
+      return new Set(['right']);
+    case 'left':
+      return new Set(['left']);
+    case 'both':
+      return new Set(['right', 'left']);
+    case 'none':
+      return new Set();
+  }
+}
+
+export function clampSpeed(speed: number): number {
+  return Math.min(MAX_SPEED, Math.max(MIN_SPEED, speed));
+}
+
+/**
+ * One practice run over a song. Pure logic: the caller feeds wall-clock time
+ * (ms, same base as performance.now()) and key presses, renders getState()
+ * and sends drainOutput() to the piano.
+ */
+export class PracticeSession {
+  private readonly config: SessionConfig;
+  private readonly auto: AutoPlayer;
+  private readonly wait: WaitJudge | null;
+  private readonly tempo: TempoJudge | null;
+  private readonly startTime: number;
+  private readonly endTime: number;
+  private songTime = 0;
+  private lastWallMs: number;
+  private status: Status = 'playing';
+  private resumeStatus: 'playing' | 'waiting' = 'playing';
+  private out: OutputEvent[] = [];
+  private pressed = new Map<number, KeyResult>();
+  private loopPass = 0;
+  private lastLoopScore: Score | null = null;
+  private pristine = true;
+
+  constructor(
+    notes: readonly PlayableNote[],
+    private readonly measures: readonly number[],
+    config: SessionConfig,
+    nowMs: number,
+  ) {
+    this.config = { ...config, speed: clampSpeed(config.speed) };
+    const practiced = practicedRoles(config.practice);
+    const required = notes.filter((n) => practiced.has(n.role));
+    this.auto = new AutoPlayer(notes.filter((n) => !practiced.has(n.role)));
+    const judging = config.practice !== 'none';
+    this.wait = judging && config.mode === 'wait' ? new WaitJudge(required) : null;
+    this.tempo = judging && config.mode === 'tempo' ? new TempoJudge(required) : null;
+    this.startTime = (notes[0]?.start ?? 0) - LEAD_IN_SECONDS * this.config.speed;
+    this.endTime = notes.reduce((max, n) => Math.max(max, n.end), 0) + END_PADDING_SECONDS;
+    this.lastWallMs = nowMs;
+    const loop = this.loopBounds();
+    if (loop) this.pristine = false;
+    this.jumpTo(loop ? loop.restart : this.startTime);
+    this.out = [];
+  }
+
+  tick(nowMs: number): void {
+    const dtMs = Math.max(0, nowMs - this.lastWallMs);
+    this.lastWallMs = Math.max(this.lastWallMs, nowMs);
+    if (this.status === 'paused' || this.status === 'finished') return;
+    this.wait?.addElapsed(dtMs);
+    if (this.status === 'waiting') return;
+    this.advanceSong(this.songTime + (dtMs / 1000) * this.config.speed);
+  }
+
+  noteOn(pitch: number, _velocity: number, timeMs: number): void {
+    if (timeMs > this.lastWallMs) this.tick(timeMs);
+    if (this.status === 'paused' || this.status === 'finished' || (!this.wait && !this.tempo)) {
+      this.pressed.set(pitch, 'neutral');
+      return;
+    }
+    const lagSeconds = Math.max(0, this.lastWallMs - timeMs) / 1000;
+    const waiting = this.status === 'waiting';
+    const eventTime = waiting ? this.songTime : this.songTime - lagSeconds * this.config.speed;
+    let result: KeyResult;
+    if (this.wait) {
+      const secondsUntilStep = Math.max(0, (this.wait.holdTime - eventTime) / this.config.speed);
+      const judged = this.wait.press(pitch, secondsUntilStep);
+      result = judged.result;
+      if (judged.completed && waiting) this.status = 'playing';
+    } else {
+      result = this.tempo!.press(pitch, eventTime, this.config.speed);
+    }
+    this.pressed.set(pitch, result);
+  }
+
+  noteOff(pitch: number, _timeMs: number): void {
+    this.pressed.delete(pitch);
+  }
+
+  pause(nowMs: number): void {
+    this.tick(nowMs);
+    if (this.status !== 'playing' && this.status !== 'waiting') return;
+    this.resumeStatus = this.status;
+    this.status = 'paused';
+    this.auto.silence();
+    this.out.push({ type: 'allNotesOff' });
+  }
+
+  resume(nowMs: number): void {
+    if (this.status !== 'paused') return;
+    this.status = this.resumeStatus;
+    this.lastWallMs = nowMs;
+  }
+
+  /** Jumps to song time t. The run no longer counts as complete. */
+  seek(t: number, nowMs: number): void {
+    this.tick(nowMs);
+    this.lastWallMs = nowMs;
+    this.pristine = false;
+    this.jumpTo(Math.min(this.endTime, Math.max(Math.min(0, this.startTime), t)));
+  }
+
+  setSpeed(speed: number, nowMs: number): void {
+    this.tick(nowMs);
+    this.config.speed = clampSpeed(speed);
+  }
+
+  /** Sets or clears the A–B loop. The run no longer counts as complete. */
+  setLoop(loop: LoopRange | null, nowMs: number): void {
+    this.tick(nowMs);
+    this.config.loop = loop;
+    this.pristine = false;
+    const bounds = this.loopBounds();
+    if (bounds && (this.songTime < bounds.restart || this.songTime >= bounds.end)) {
+      this.jumpTo(bounds.restart);
+    } else {
+      this.resetJudges(this.songTime);
+      if (this.status === 'waiting') this.status = 'playing';
+    }
+  }
+
+  setSound(soundOn: boolean, volume: number): void {
+    const wasAudible = this.audible;
+    this.config.soundOn = soundOn;
+    this.config.volume = volume;
+    if (wasAudible && !this.audible) {
+      this.auto.silence();
+      this.out.push({ type: 'allNotesOff' });
+    }
+  }
+
+  getState(): SessionState {
+    return {
+      songTime: this.songTime,
+      status: this.status,
+      speed: this.config.speed,
+      loop: this.config.loop,
+      pressed: new Map(this.pressed),
+      expected: new Set(this.status === 'waiting' && this.wait ? this.wait.pending : []),
+      score: this.wait?.score ?? this.tempo?.score ?? null,
+      loopPass: this.loopPass,
+      lastLoopScore: this.lastLoopScore,
+      complete: this.pristine && this.status === 'finished',
+    };
+  }
+
+  /** Events for the piano since the last call. */
+  drainOutput(): OutputEvent[] {
+    const out = this.out;
+    this.out = [];
+    return out;
+  }
+
+  private get audible(): boolean {
+    return this.config.soundOn && this.config.volume > 0;
+  }
+
+  private advanceSong(target: number): void {
+    if (this.wait && this.wait.holdTime <= target) {
+      this.moveTo(Math.max(this.songTime, this.wait.holdTime));
+      this.status = 'waiting';
+      return;
+    }
+    const loop = this.loopBounds();
+    if (loop && target >= loop.end) {
+      this.moveTo(loop.end);
+      this.tempo?.finalize();
+      this.loopPass++;
+      const score = this.wait?.score ?? this.tempo?.score ?? null;
+      this.lastLoopScore = score ? { ...score } : null;
+      this.jumpTo(loop.restart);
+      return;
+    }
+    if (!loop && target >= this.endTime) {
+      this.moveTo(this.endTime);
+      this.tempo?.finalize();
+      this.status = 'finished';
+      this.auto.silence();
+      this.out.push({ type: 'allNotesOff' });
+      return;
+    }
+    this.moveTo(target);
+  }
+
+  private moveTo(t: number): void {
+    const audible = this.audible;
+    this.auto.advanceTo(t, this.config.volume, (e) => {
+      if (audible) this.out.push(e);
+    });
+    this.tempo?.advanceTo(t, this.config.speed);
+    this.songTime = t;
+  }
+
+  private jumpTo(t: number): void {
+    this.songTime = t;
+    this.auto.reset(t);
+    this.out.push({ type: 'allNotesOff' });
+    this.resetJudges(t);
+    if (this.status !== 'paused') this.status = 'playing';
+    this.resumeStatus = 'playing';
+  }
+
+  private resetJudges(from: number): void {
+    const loop = this.loopBounds();
+    const start = loop ? Math.max(from, loop.start) : from;
+    const end = loop ? loop.end : Infinity;
+    this.wait?.reset(start, end);
+    this.tempo?.reset(start, end);
+  }
+
+  private loopBounds(): LoopBounds | null {
+    const loop = this.config.loop;
+    const count = this.measures.length - 1;
+    if (!loop || count < 1) return null;
+    const first = Math.min(Math.max(0, loop.startMeasure), count - 1);
+    const last = Math.min(Math.max(first, loop.endMeasure), count - 1);
+    const start = this.measures[first];
+    const leadIn = this.measures[first + 1] - start;
+    return { start, end: this.measures[last + 1], restart: start - leadIn };
+  }
+}
