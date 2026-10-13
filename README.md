@@ -20,7 +20,8 @@ Bluetooth MIDI. Built for a Roland FP-10 and an Android tablet running Chrome.
      Accept Chrome's MIDI permission prompt. The app connects by itself and reconnects
      when you plug the cable back in.
    - **Bluetooth**: Settings → *Connect via Bluetooth*, pick the FP-10. Chrome needs this
-     tap once per session.
+     tap once per session. Do not pair the FP-10 in Android's Bluetooth settings first;
+     connect only from the app.
 4. *Add song* → pick a `.mid` file (or add the demo song) → choose hand, mode and speed →
    *Start*.
 
