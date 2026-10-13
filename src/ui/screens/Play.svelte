@@ -22,7 +22,10 @@
   let canvas = $state<HTMLCanvasElement>();
   let song = $state<Song | null>(null);
   let failed = $state(false);
-  let controller: PlayController | null = null;
+  let controller = $state.raw<PlayController | null>(null);
+  let destroyed = false;
+  /** Incremented whenever a run is restarted or sought, so stale finish() results are ignored. */
+  let runId = 0;
   // svelte-ignore state_referenced_locally
   let hand = $state<HandChoice>(request.hand);
   let songTime = $state(0);
@@ -60,8 +63,10 @@
 
   async function finish(score: Score, complete: boolean) {
     const snapshot = { ...score };
+    const myRun = runId;
     const percent = scorePercent(snapshot);
     if (!complete) {
+      if (myRun !== runId || destroyed) return;
       results = { score: snapshot, saved: false, isNewBest: false, bestPercent: null };
       return;
     }
@@ -71,12 +76,18 @@
       percent,
       score: snapshot,
     });
+    if (myRun !== runId || destroyed) return;
     results = { score: snapshot, saved: true, isNewBest, bestPercent: record.best.percent };
   }
 
   async function requestWakeLock() {
     try {
-      wakeLock = (await navigator.wakeLock?.request('screen')) ?? null;
+      const sentinel = (await navigator.wakeLock?.request('screen')) ?? null;
+      if (destroyed) {
+        void sentinel?.release().catch(() => undefined);
+        return;
+      }
+      wakeLock = sentinel;
     } catch {
       wakeLock = null;
     }
@@ -89,13 +100,14 @@
 
   onMount(async () => {
     const loaded = await loadSong(request.songId);
+    if (destroyed) return;
     if (!loaded || !canvas) {
       failed = true;
       return;
     }
     song = loaded.song;
     const notes = applyHandConfig(loaded.song, loaded.handConfig);
-    controller = new PlayController(
+    const created = new PlayController(
       canvas,
       notes,
       loaded.song.measures,
@@ -111,20 +123,27 @@
       display(),
       onFrame,
     );
-    controller.start();
+    created.start();
+    controller = created;
     void requestWakeLock();
     document.addEventListener('visibilitychange', onVisibility);
   });
 
   onDestroy(() => {
+    destroyed = true;
     controller?.stop();
     document.removeEventListener('visibilitychange', onVisibility);
     void wakeLock?.release().catch(() => undefined);
   });
 
   $effect(() => {
-    controller?.setSound($settings.soundOn, $settings.volume);
-    controller?.setDisplay(display());
+    // Read every dependency before touching the controller so the effect always tracks them;
+    // `controller` is $state.raw, so the effect also re-runs once it has been created.
+    const { soundOn, volume } = $settings;
+    const options = display();
+    const active = controller;
+    active?.setSound(soundOn, volume);
+    active?.setDisplay(options);
   });
 
   function togglePause() {
@@ -139,7 +158,9 @@
   function changeHand(next: HandChoice) {
     hand = next;
     results = null;
-    controller?.restart({ practice: next }, true);
+    runId++;
+    // Keep the position only when the song is under way; otherwise restart so the run stays saveable.
+    controller?.restart({ practice: next }, songTime > 0);
   }
 
   function toggleLoop() {
@@ -168,11 +189,13 @@
     const rect = bar.getBoundingClientRect();
     const fraction = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
     results = null;
+    runId++;
     controller?.seek(fraction * song.duration);
   }
 
   function retry() {
     results = null;
+    runId++;
     controller?.restart({}, false);
   }
 
@@ -217,13 +240,13 @@
       <button class:active={loop !== null} onclick={toggleLoop}>{$t('play.loop')}</button>
       {#if loop}
         <span class="dim">{$t('play.loopFrom')}</span>
-        <button onclick={() => moveLoop('start', -1)}>−</button>
+        <button onclick={() => moveLoop('start', -1)} aria-label={`${$t('play.loopFrom')} −`}>−</button>
         <span class="value">{loop.startMeasure + 1}</span>
-        <button onclick={() => moveLoop('start', 1)}>+</button>
+        <button onclick={() => moveLoop('start', 1)} aria-label={`${$t('play.loopFrom')} +`}>+</button>
         <span class="dim">{$t('play.loopTo')}</span>
-        <button onclick={() => moveLoop('end', -1)}>−</button>
+        <button onclick={() => moveLoop('end', -1)} aria-label={`${$t('play.loopTo')} −`}>−</button>
         <span class="value">{loop.endMeasure + 1}</span>
-        <button onclick={() => moveLoop('end', 1)}>+</button>
+        <button onclick={() => moveLoop('end', 1)} aria-label={`${$t('play.loopTo')} +`}>+</button>
         {#if loopPass > 0 && lastLoopScore}
           <span class="pass">{$t('play.loopPass', { n: loopPass, percent: scorePercent(lastLoopScore) })}</span>
         {/if}

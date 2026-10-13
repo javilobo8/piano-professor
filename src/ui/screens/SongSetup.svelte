@@ -21,6 +21,8 @@
   let song = $state<Song | null>(null);
   let handConfig = $state<HandConfig | null>(null);
   let failed = $state(false);
+  /** Split pitch shown while dragging the slider; null when not dragging. */
+  let draftSplit = $state<number | null>(null);
   let hand = $state<HandChoice>($settings.lastHand);
   let mode = $state<Mode>($settings.lastMode);
   let speedPercent = $state(Math.round($settings.lastSpeed * 100));
@@ -117,13 +119,17 @@
 
         {#if handConfig.method === 'split'}
           <label class="field">
-            <span>{$t('setup.splitPoint', { note: $nameNote(handConfig.splitPitch) })}</span>
+            <span>{$t('setup.splitPoint', { note: $nameNote(draftSplit ?? handConfig.splitPitch) })}</span>
             <input
               type="range"
               min="36"
               max="84"
               value={handConfig.splitPitch}
-              onchange={(e) => void updateConfig({ ...handConfig!, splitPitch: Number(e.currentTarget.value) })}
+              oninput={(e) => (draftSplit = Number(e.currentTarget.value))}
+              onchange={(e) => {
+                draftSplit = null;
+                void updateConfig({ ...handConfig!, splitPitch: Number(e.currentTarget.value) });
+              }}
             />
           </label>
         {:else}
