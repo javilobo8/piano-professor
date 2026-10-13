@@ -77,6 +77,10 @@
     await refresh();
   }
 
+  function openSettings() {
+    screen.update((current) => ({ name: 'settings', back: current }));
+  }
+
   function bestScores(id: string): ScoreRecord[] {
     return [...(scores[id] ?? [])].sort((a, b) => b.best.percent - a.best.percent).slice(0, 3);
   }
@@ -86,6 +90,9 @@
   <header class="screen-header">
     <h1>{$t('app.title')}</h1>
     <ConnectionBadge />
+    <button class="ghost gear" onclick={openSettings} aria-label={$t('settings.title')} title={$t('settings.title')}
+      >⚙</button
+    >
   </header>
 
   <div class="actions">

@@ -6,6 +6,7 @@ import type { PlayableNote, PlayRole } from '../song/types';
 import { geometry, drawFrame, maxNoteDuration } from '../render/renderer';
 import { keyAt, layoutKeyboard, songRange, type KeyboardLayout } from '../render/keyboard-layout';
 import { DEFAULT_BASE_PITCH, OCTAVE_DOWN_KEY, OCTAVE_UP_KEY, pcKeyToPitch, shiftOctave } from './pc-keyboard';
+import { restartPosition } from './restart-position';
 
 export interface DisplayOptions {
   showAccompaniment: boolean;
@@ -24,6 +25,7 @@ export class PlayController {
   private cssWidth = 0;
   private cssHeight = 0;
   private readonly maxDuration: number;
+  private readonly firstNoteStart: number;
   private practiced: Set<PlayRole>;
   private pointers = new Map<number, number>();
   private pcHeld = new Map<string, number>();
@@ -42,6 +44,7 @@ export class PlayController {
   ) {
     this.display = display;
     this.maxDuration = maxNoteDuration(notes);
+    this.firstNoteStart = notes.reduce((min, n) => Math.min(min, n.start), Infinity);
     this.practiced = practicedRoles(config.practice);
     this.session = new PracticeSession(notes, measures, config, performance.now());
   }
@@ -62,6 +65,10 @@ export class PlayController {
     this.listen(this.canvas, 'pointercancel', this.onPointerUp);
     this.listen(window, 'keydown', this.onKeyDown);
     this.listen(window, 'keyup', this.onKeyUp);
+    // Leaving or closing the app must not leave notes hanging on the piano.
+    const onPageHide = () => this.connection.send({ type: 'allNotesOff' });
+    window.addEventListener('pagehide', onPageHide);
+    this.cleanups.push(() => window.removeEventListener('pagehide', onPageHide));
     this.resize();
     const loop = () => {
       this.session.tick(performance.now());
@@ -116,15 +123,19 @@ export class PlayController {
     this.flush();
   }
 
-  /** Starts a fresh session with new settings (hand change or retry). */
+  /**
+   * Starts a fresh session with new settings (hand change or retry). With
+   * `keepPosition`, a run that is under way continues from the same point;
+   * a finished run or one still in its lead-in starts over.
+   */
   restart(changes: Partial<SessionConfig>, keepPosition: boolean): void {
-    const position = this.session.getState().songTime;
+    const position = keepPosition ? restartPosition(this.session.getState(), this.firstNoteStart) : null;
     this.connection.send({ type: 'allNotesOff' });
     this.config = { ...this.config, ...changes };
     this.practiced = practicedRoles(this.config.practice);
     const now = performance.now();
     this.session = new PracticeSession(this.notes, this.measures, this.config, now);
-    if (keepPosition && !this.config.loop) this.session.seek(position, now);
+    if (position !== null && !this.config.loop) this.session.seek(position, now);
     this.flush();
   }
 

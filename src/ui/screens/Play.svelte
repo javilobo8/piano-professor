@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
   import { scorePercent } from '../../engine/scoring';
+  import { clampSpeed } from '../../engine/session';
   import type { LoopRange, Score, SessionState, Status } from '../../engine/types';
   import { applyHandConfig } from '../../song/hands';
   import type { Song } from '../../song/types';
@@ -34,7 +35,7 @@
   let speed = $state(request.speed);
   let loop = $state<LoopRange | null>(null);
   let loopPass = $state(0);
-  let lastLoopScore = $state<Score | null>(null);
+  let lastLoopScore = $state.raw<Score | null>(null);
   let results = $state<{ score: Score; saved: boolean; isNewBest: boolean; bestPercent: number | null } | null>(
     null,
   );
@@ -151,16 +152,31 @@
     else controller?.pause();
   }
 
+  /** A new run starts: drop stale results and let the next 'finished' show the overlay again. */
+  function newRun() {
+    results = null;
+    runId++;
+    status = 'playing';
+  }
+
+  /** Keeps the Play request (for returning from Settings) and the defaults in step with the screen. */
+  function rememberChoices() {
+    screen.update((s) => (s.name === 'play' ? { ...s, request: { ...s.request, hand, speed } } : s));
+    settings.update((s) => ({ ...s, lastHand: hand, lastSpeed: speed }));
+  }
+
   function changeSpeed(delta: number) {
-    controller?.setSpeed(Math.round((speed + delta) * 100) / 100);
+    speed = clampSpeed(Math.round((speed + delta) * 100) / 100);
+    controller?.setSpeed(speed);
+    rememberChoices();
   }
 
   function changeHand(next: HandChoice) {
     hand = next;
-    results = null;
-    runId++;
-    // Keep the position only when the song is under way; otherwise restart so the run stays saveable.
-    controller?.restart({ practice: next }, songTime > 0);
+    newRun();
+    // The controller keeps the position only while the run is under way; otherwise it starts over.
+    controller?.restart({ practice: next }, true);
+    rememberChoices();
   }
 
   function toggleLoop() {
@@ -171,6 +187,7 @@
       const start = measureAt(song.measures, Math.max(0, songTime));
       loop = { startMeasure: start, endMeasure: Math.min(measureCount - 1, start + 3) };
     }
+    newRun();
     controller?.setLoop(loop);
   }
 
@@ -180,6 +197,7 @@
     if (edge === 'start') startMeasure = Math.min(endMeasure, Math.max(0, startMeasure + delta));
     else endMeasure = Math.max(startMeasure, Math.min(measureCount - 1, endMeasure + delta));
     loop = { startMeasure, endMeasure };
+    newRun();
     controller?.setLoop(loop);
   }
 
@@ -188,14 +206,12 @@
     const bar = event.currentTarget as HTMLElement;
     const rect = bar.getBoundingClientRect();
     const fraction = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
-    results = null;
-    runId++;
+    newRun();
     controller?.seek(fraction * song.duration);
   }
 
   function retry() {
-    results = null;
-    runId++;
+    newRun();
     controller?.restart({}, false);
   }
 

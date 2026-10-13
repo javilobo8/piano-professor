@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
+  import { practicedRoles } from '../../engine/session';
   import type { Mode } from '../../engine/types';
   import { applyHandConfig, autoHandConfig } from '../../song/hands';
   import type { HandConfig, Role, Song } from '../../song/types';
@@ -30,6 +31,13 @@
   let previewing = $state<'song' | number | null>(null);
   const previewer = new Previewer(connection);
 
+  /** False when the chosen hand gets no notes under the current track roles or split. */
+  const handHasNotes = $derived.by(() => {
+    if (!song || !handConfig) return true;
+    const roles = practicedRoles(hand);
+    return applyHandConfig(song, handConfig).some((n) => roles.has(n.role));
+  });
+
   onMount(async () => {
     const loaded = await loadSong(songId);
     if (!loaded) {
@@ -54,7 +62,9 @@
 
   function setSplit(enabled: boolean) {
     if (!handConfig || !song) return;
-    const tracks = enabled ? handConfig.trackRoles : autoHandConfig(song).trackRoles;
+    // Back to tracks: keep the roles the user chose; fall back to the automatic ones only if there are none.
+    const keep = enabled || Object.keys(handConfig.trackRoles).length > 0;
+    const tracks = keep ? handConfig.trackRoles : autoHandConfig(song).trackRoles;
     void updateConfig({ ...handConfig, method: enabled ? 'split' : 'tracks', trackRoles: tracks });
   }
 
@@ -85,7 +95,12 @@
     return { low, high };
   }
 
+  function openSettings() {
+    screen.update((current) => ({ name: 'settings', back: current }));
+  }
+
   function start() {
+    if (!handHasNotes) return;
     previewer.stop();
     const speed = speedPercent / 100;
     settings.update((s) => ({ ...s, lastHand: hand, lastMode: mode, lastSpeed: speed }));
@@ -98,6 +113,9 @@
     <button class="ghost" onclick={() => screen.set({ name: 'library' })} aria-label={$t('common.back')}>←</button>
     <h1>{song?.title ?? ''}</h1>
     <ConnectionBadge />
+    <button class="ghost gear" onclick={openSettings} aria-label={$t('settings.title')} title={$t('settings.title')}
+      >⚙</button
+    >
   </header>
 
   {#if failed}
@@ -196,11 +214,14 @@
           <span>{$t('setup.volume')}: {Math.round($settings.volume * 100)}%</span>
           <input type="range" min="0" max="1" step="0.05" bind:value={$settings.volume} />
         </label>
+        {#if !handHasNotes}
+          <p class="error">{$t('setup.noNotesForHand')}</p>
+        {/if}
         <div class="buttons">
           <button onclick={() => togglePreview('song')}>
             {previewing === 'song' ? $t('setup.stop') : $t('setup.listen')}
           </button>
-          <button class="primary" onclick={start}>{$t('setup.start')} ▶</button>
+          <button class="primary" onclick={start} disabled={!handHasNotes}>{$t('setup.start')} ▶</button>
         </div>
       </section>
     </div>

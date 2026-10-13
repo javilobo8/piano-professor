@@ -7,23 +7,20 @@ export const es: Record<MessageKey, string> = {
   'common.save': 'Guardar',
   'common.delete': 'Borrar',
   'common.rename': 'Renombrar',
-  'common.yes': 'Sí',
-  'common.no': 'No',
 
   'conn.connected': 'Conectado · {name}',
   'conn.connecting': 'Conectando…',
   'conn.disconnected': 'Sin piano',
   'conn.usb': 'USB',
-  'conn.bluetooth': 'Bluetooth',
   'conn.connectBluetooth': 'Conectar por Bluetooth',
   'conn.retryUsb': 'Buscar de nuevo el piano USB',
   'conn.device': 'Dispositivo MIDI',
   'conn.noDevices': 'No se encuentra ningún dispositivo MIDI. Conecta el piano por USB o por Bluetooth.',
-  'conn.bluetoothHint': 'Chrome lo pide cada vez que abres la app: pulsa el botón una vez por sesión.',
+  'conn.bluetoothHint': 'Hay que volver a conectar el Bluetooth cada vez que abres la app: pulsa el botón una vez por sesión.',
 
   'error.midi-unsupported': 'Este navegador no tiene MIDI. Abre la app en Chrome.',
   'error.midi-denied':
-    'El acceso MIDI está bloqueado. Permítelo en la configuración del sitio (icono a la izquierda de la dirección) y recarga.',
+    'El acceso MIDI está bloqueado. Permítelo en Chrome › Configuración › Configuración de sitios › Dispositivos MIDI (o mantén pulsado el icono de la app › Información de la app › Permisos) y vuelve a abrir la app.',
   'error.bluetooth-unsupported': 'Bluetooth no está disponible. Usa Chrome en Android con el Bluetooth activado.',
   'error.bluetooth-failed':
     'No se pudo conectar por Bluetooth. Comprueba que el piano está encendido y no conectado a otra app.',
@@ -51,6 +48,7 @@ export const es: Record<MessageKey, string> = {
   'setup.listen': 'Escuchar la canción',
   'setup.stop': 'Parar',
   'setup.start': 'Empezar',
+  'setup.noNotesForHand': 'Esta mano no tiene notas en esta canción.',
 
   'role.right': 'Mano derecha',
   'role.left': 'Mano izquierda',
@@ -75,8 +73,6 @@ export const es: Record<MessageKey, string> = {
   'play.loopFrom': 'A',
   'play.loopTo': 'B',
   'play.loopPass': 'Vuelta {n}: {percent}%',
-  'play.measure': 'Compás {n}',
-  'play.restart': 'Reiniciar',
 
   'results.title': 'Resultados',
   'results.cleanSteps': 'Pasos sin errores',

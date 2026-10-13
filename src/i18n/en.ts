@@ -5,22 +5,20 @@ export const en = {
   'common.save': 'Save',
   'common.delete': 'Delete',
   'common.rename': 'Rename',
-  'common.yes': 'Yes',
-  'common.no': 'No',
 
   'conn.connected': 'Connected · {name}',
   'conn.connecting': 'Connecting…',
   'conn.disconnected': 'No piano',
   'conn.usb': 'USB',
-  'conn.bluetooth': 'Bluetooth',
   'conn.connectBluetooth': 'Connect via Bluetooth',
   'conn.retryUsb': 'Look for USB piano again',
   'conn.device': 'MIDI device',
   'conn.noDevices': 'No MIDI device found. Plug the piano in over USB or connect via Bluetooth.',
-  'conn.bluetoothHint': 'Chrome asks again each time you open the app: tap the button once per session.',
+  'conn.bluetoothHint': 'Bluetooth has to be connected again each time you open the app: tap the button once per session.',
 
   'error.midi-unsupported': 'This browser has no MIDI support. Open the app in Chrome.',
-  'error.midi-denied': 'MIDI access is blocked. Allow it in the site settings (icon left of the address) and reload.',
+  'error.midi-denied':
+    'MIDI access is blocked. Allow it in Chrome › Settings › Site settings › MIDI devices (or long-press the app icon › App info › Permissions), then reopen the app.',
   'error.bluetooth-unsupported': 'Bluetooth is not available. Use Chrome on Android with Bluetooth turned on.',
   'error.bluetooth-failed': 'Could not connect over Bluetooth. Check the piano is on and not connected to another app.',
   'error.invalidMidi': '"{name}" could not be read as MIDI.',
@@ -47,6 +45,7 @@ export const en = {
   'setup.listen': 'Listen to the song',
   'setup.stop': 'Stop',
   'setup.start': 'Start',
+  'setup.noNotesForHand': 'This hand has no notes in this song.',
 
   'role.right': 'Right hand',
   'role.left': 'Left hand',
@@ -71,8 +70,6 @@ export const en = {
   'play.loopFrom': 'A',
   'play.loopTo': 'B',
   'play.loopPass': 'Pass {n}: {percent}%',
-  'play.measure': 'Bar {n}',
-  'play.restart': 'Restart',
 
   'results.title': 'Results',
   'results.cleanSteps': 'Clean steps',
