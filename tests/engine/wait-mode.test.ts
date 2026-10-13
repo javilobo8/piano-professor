@@ -66,11 +66,13 @@ describe('wait mode', () => {
   });
 
   it('a press 300 ms early is wrong', () => {
-    const s = waitSession([pn(60, 0, 1)]);
-    s.tick(1700);
-    s.noteOn(60, 0.8, 1700);
+    const s = waitSession([pn(59, 0, 0.5), pn(60, 1, 1)]);
+    s.tick(2000);
+    s.noteOn(59, 0.8, 2000);
+    s.tick(2700);
+    s.noteOn(60, 0.8, 2700);
     expect(s.getState().pressed.get(60)).toBe('wrong');
-    s.tick(2100);
+    s.tick(3100);
     expect(s.getState().status).toBe('waiting');
   });
 
@@ -85,13 +87,47 @@ describe('wait mode', () => {
     expect(s.getState().status).toBe('playing');
   });
 
-  it('practising the left hand waits for left-hand notes and plays the right hand', () => {
+  it('practising the left hand waits for left-hand notes and plays the right hand with them', () => {
     const s = waitSession([pn(72, 0, 1, 'right'), pn(48, 0, 1, 'left')], 'left');
     s.tick(2000);
-    expect(s.drainOutput()).toEqual([{ type: 'noteOn', pitch: 72, velocity: 102 }]);
+    expect(s.drainOutput().some((e) => e.type === 'noteOn' && e.pitch === 72)).toBe(false);
     expect([...s.getState().expected]).toEqual([48]);
     s.noteOn(48, 0.8, 2100);
     expect(s.getState().pressed.get(48)).toBe('left');
+    expect(s.drainOutput()).toContainEqual({ type: 'noteOn', pitch: 72, velocity: 102 });
+  });
+
+  it('holds back other-hand notes that share the step until the step is played', () => {
+    const s = waitSession([
+      pn(60, 0, 0.5, 'right'),
+      pn(50, 0.5, 0.2, 'left'),
+      pn(62, 1, 0.5, 'right'),
+      pn(48, 1, 1, 'left'),
+    ]);
+    s.tick(2000);
+    s.noteOn(60, 0.8, 2000);
+    s.tick(3000);
+    expect(s.getState()).toMatchObject({ status: 'waiting', songTime: 1 });
+    const whileWaiting = s.drainOutput();
+    // Notes before the step play on time; the one at the step waits for the pianist.
+    expect(whileWaiting).toContainEqual({ type: 'noteOn', pitch: 50, velocity: 102 });
+    expect(whileWaiting.some((e) => e.type === 'noteOn' && e.pitch === 48)).toBe(false);
+    s.tick(4000);
+    expect(s.drainOutput().some((e) => e.type === 'noteOn' && e.pitch === 48)).toBe(false);
+    s.noteOn(62, 0.8, 4100);
+    expect(s.getState().status).toBe('playing');
+    expect(s.drainOutput()).toEqual([{ type: 'noteOn', pitch: 48, velocity: 102 }]);
+  });
+
+  it('a press during the lead-in before the first step is neutral and does not spoil it', () => {
+    const s = waitSession([pn(60, 0, 1)]);
+    s.tick(1000);
+    s.noteOn(60, 0.8, 1000);
+    expect(s.getState().pressed.get(60)).toBe('neutral');
+    s.noteOff(60, 1100);
+    s.tick(2000);
+    s.noteOn(60, 0.8, 2000);
+    expect(s.getState().score).toMatchObject({ completedSteps: 1, cleanSteps: 1, wrongNotes: 0 });
   });
 
   it('counts elapsed time while waiting but not while paused', () => {
@@ -118,23 +154,25 @@ describe('wait mode', () => {
   });
 
   it('the early-press tolerance is real time: at half speed 90 ms early counts, 150 ms is wrong', () => {
-    const ok = new PracticeSession(
-      [pn(60, 0, 1)],
-      MEASURES,
-      { mode: 'wait', practice: 'right', speed: 0.5, loop: null, soundOn: true, volume: 1 },
-      0,
-    );
-    ok.tick(1910);
-    ok.noteOn(60, 0.8, 1910);
+    // Second step at song time 1: reached at 2000 + 2000 ms at half speed.
+    const halfSpeed = () => {
+      const s = new PracticeSession(
+        [pn(59, 0, 0.5), pn(60, 1, 1)],
+        MEASURES,
+        { mode: 'wait', practice: 'right', speed: 0.5, loop: null, soundOn: true, volume: 1 },
+        0,
+      );
+      s.tick(2000);
+      s.noteOn(59, 0.8, 2000);
+      return s;
+    };
+    const ok = halfSpeed();
+    ok.tick(3910);
+    ok.noteOn(60, 0.8, 3910);
     expect(ok.getState().pressed.get(60)).toBe('right');
-    const bad = new PracticeSession(
-      [pn(60, 0, 1)],
-      MEASURES,
-      { mode: 'wait', practice: 'right', speed: 0.5, loop: null, soundOn: true, volume: 1 },
-      0,
-    );
-    bad.tick(1850);
-    bad.noteOn(60, 0.8, 1850);
+    const bad = halfSpeed();
+    bad.tick(3850);
+    bad.noteOn(60, 0.8, 3850);
     expect(bad.getState().pressed.get(60)).toBe('wrong');
   });
 });

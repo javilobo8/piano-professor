@@ -84,6 +84,21 @@ describe('tempo mode', () => {
     expect(scorePercent(state.score!)).toBe(25);
   });
 
+  it('a press during the lead-in before the first note is neutral and counts no extra', () => {
+    const s = tempoSession([pn(60, 0, 1)]);
+    s.tick(1000);
+    s.noteOn(60, 0.8, 1000);
+    expect(s.getState().pressed.get(60)).toBe('neutral');
+    s.noteOff(60, 1100);
+    s.tick(1800);
+    s.noteOn(61, 0.8, 1800);
+    expect(s.getState().pressed.get(61)).toBe('neutral');
+    s.tick(1900);
+    s.noteOn(62, 0.8, 1900);
+    expect(s.getState().pressed.get(62)).toBe('wrong');
+    expect(s.getState().score).toMatchObject({ extras: 1, hits: 0 });
+  });
+
   it('at half speed a press 200 ms late is outside the scaled window', () => {
     const s = tempoSession([pn(60, 0, 1)], 0.5);
     s.tick(2200);

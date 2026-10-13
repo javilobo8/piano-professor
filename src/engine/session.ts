@@ -56,6 +56,8 @@ export class PracticeSession {
   private readonly tempo: TempoJudge | null;
   private readonly startTime: number;
   private readonly endTime: number;
+  /** Start of the first required note, or -Infinity when nothing is required. */
+  private readonly firstRequired: number;
   private songTime = 0;
   private lastWallMs: number;
   private status: Status = 'playing';
@@ -77,6 +79,8 @@ export class PracticeSession {
     this.config = { ...config, speed: clampSpeed(config.speed) };
     const practiced = practicedRoles(config.practice);
     const required = notes.filter((n) => practiced.has(n.role));
+    const first = required.reduce((min, n) => Math.min(min, n.start), Infinity);
+    this.firstRequired = first === Infinity ? -Infinity : first;
     this.auto = new AutoPlayer(notes.filter((n) => !practiced.has(n.role)));
     const judging = config.practice !== 'none';
     this.wait = judging && config.mode === 'wait' ? new WaitJudge(required) : null;
@@ -108,9 +112,11 @@ export class PracticeSession {
     const lagSeconds = Math.max(0, this.lastWallMs - timeMs) / 1000;
     const waiting = this.status === 'waiting';
     const eventTime = waiting ? this.songTime : this.songTime - lagSeconds * this.config.speed;
+    // Presses before the judged range (lead-in to the song or to the loop) are not judged.
     const loop = this.loopBounds();
+    const rangeStart = loop ? loop.start : this.firstRequired;
     const tolerance = (this.wait ? EARLY_PRESS_SECONDS : HIT_WINDOW_SECONDS) * this.config.speed;
-    if (loop && eventTime < loop.start - tolerance) {
+    if (eventTime < rangeStart - tolerance) {
       this.pressed.set(pitch, 'neutral');
       return;
     }
@@ -119,7 +125,11 @@ export class PracticeSession {
       const secondsUntilStep = Math.max(0, (this.wait.holdTime - eventTime) / this.config.speed);
       const judged = this.wait.press(pitch, secondsUntilStep);
       result = judged.result;
-      if (judged.completed && waiting) this.status = 'playing';
+      if (judged.completed && waiting) {
+        this.status = 'playing';
+        // Release the other hand's notes held back at this step, right after the pianist's key.
+        this.moveTo(this.songTime);
+      }
     } else {
       result = this.tempo!.press(pitch, eventTime, this.config.speed);
     }
@@ -254,13 +264,15 @@ export class PracticeSession {
     const audible = this.audible;
     const loop = this.loopBounds();
     const autoTarget = loop ? Math.min(t, loop.end) : t;
+    // Wait mode: notes at or after the step the clock holds at start only once it is played.
+    const startLimit = Math.min(loop ? loop.end : Infinity, this.wait ? this.wait.holdTime : Infinity);
     this.auto.advanceTo(
       autoTarget,
       this.config.volume,
       (e) => {
         if (audible) this.out.push(e);
       },
-      loop ? loop.end : Infinity,
+      startLimit,
     );
     this.autoTime = Math.max(this.autoTime, autoTarget);
     this.tempo?.advanceTo(t, this.config.speed);
