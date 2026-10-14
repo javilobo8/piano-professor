@@ -11,8 +11,14 @@ describe('decodeMidiMessage', () => {
     expect(decodeMidiMessage([0x90, 60, 0], 1)).toEqual({ type: 'off', pitch: 60, velocity: 0, timeMs: 1 });
   });
 
-  it('ignores pedal, other messages and short data', () => {
-    expect(decodeMidiMessage([0xb0, 64, 127], 0)).toBeNull();
+  it('decodes the sustain pedal on any channel', () => {
+    expect(decodeMidiMessage([0xb0, 64, 127], 3)).toEqual({ type: 'pedal', down: true, timeMs: 3 });
+    expect(decodeMidiMessage([0xb2, 64, 64], 3)).toEqual({ type: 'pedal', down: true, timeMs: 3 });
+    expect(decodeMidiMessage([0xb0, 64, 63], 4)).toEqual({ type: 'pedal', down: false, timeMs: 4 });
+  });
+
+  it('ignores other controllers, other messages and short data', () => {
+    expect(decodeMidiMessage([0xb0, 7, 100], 0)).toBeNull();
     expect(decodeMidiMessage([0xfe], 0)).toBeNull();
   });
 });

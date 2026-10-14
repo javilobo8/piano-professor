@@ -4,7 +4,7 @@ import {
   ConnectionManager,
   MidiAccessError,
 } from '../../src/midi-io/connection-manager';
-import type { ConnectionStatus, MidiConnection, NoteEvent } from '../../src/midi-io/types';
+import type { ConnectionStatus, MidiConnection, MidiInputEvent, NoteEvent, PedalEvent } from '../../src/midi-io/types';
 
 class FakePort {
   state: 'connected' | 'disconnected' = 'connected';
@@ -120,19 +120,37 @@ describe('ConnectionManager over USB', () => {
     manager.selectUsbInput('b');
     expect(manager.current).toMatchObject({ state: 'connected', name: 'Other' });
   });
+
+  it('forwards the sustain pedal apart from the notes', async () => {
+    const { access, manager, notes } = setup();
+    const fp10 = new FakePort('b', 'FP-10');
+    access.inputs.set('b', fp10);
+    const pedals: PedalEvent[] = [];
+    manager.onPedal((e) => pedals.push(e));
+    await manager.startUsb(null);
+    // Web MIDI stamps share performance.now()'s base (eventTime() rejects stamps far from now).
+    const t = performance.now();
+    fp10.play([0xb0, 64, 127], t);
+    fp10.play([0xb0, 64, 0], t + 1);
+    expect(pedals).toEqual([
+      { type: 'pedal', down: true, timeMs: t },
+      { type: 'pedal', down: false, timeMs: t + 1 },
+    ]);
+    expect(notes).toEqual([]);
+  });
 });
 
 describe('ConnectionManager over Bluetooth', () => {
-  function fakeBle(): MidiConnection & { emit(e: NoteEvent): void; drop(): void; sent: unknown[] } {
-    const noteCbs = new Set<(e: NoteEvent) => void>();
+  function fakeBle(): MidiConnection & { emit(e: MidiInputEvent): void; drop(): void; sent: unknown[] } {
+    const inputCbs = new Set<(e: MidiInputEvent) => void>();
     const dropCbs = new Set<() => void>();
     return {
       kind: 'ble',
       name: 'FP-10 BLE',
       sent: [],
-      onNote(cb) {
-        noteCbs.add(cb);
-        return () => noteCbs.delete(cb);
+      onInput(cb) {
+        inputCbs.add(cb);
+        return () => inputCbs.delete(cb);
       },
       onDisconnect(cb) {
         dropCbs.add(cb);
@@ -143,7 +161,7 @@ describe('ConnectionManager over Bluetooth', () => {
       },
       close: vi.fn(),
       emit(e) {
-        for (const cb of noteCbs) cb(e);
+        for (const cb of inputCbs) cb(e);
       },
       drop() {
         for (const cb of dropCbs) cb();

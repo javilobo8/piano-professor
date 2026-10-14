@@ -7,7 +7,7 @@ import {
   encodeBlePacket,
 } from './ble-packet';
 import { MidiOutputEncoder, decodeMidiMessage } from './messages';
-import type { MidiConnection, NoteEvent } from './types';
+import type { MidiConnection, MidiInputEvent } from './types';
 
 const RECONNECT_DELAYS_MS = [1000, 2000, 4000];
 
@@ -15,7 +15,7 @@ const RECONNECT_DELAYS_MS = [1000, 2000, 4000];
 export class BleMidiConnection implements MidiConnection {
   readonly kind = 'ble' as const;
   private characteristic: BluetoothRemoteGATTCharacteristic | null = null;
-  private noteListeners = new Set<(e: NoteEvent) => void>();
+  private inputListeners = new Set<(e: MidiInputEvent) => void>();
   private disconnectListeners = new Set<() => void>();
   private encoder = new MidiOutputEncoder();
   private writes: Promise<unknown> = Promise.resolve();
@@ -44,10 +44,10 @@ export class BleMidiConnection implements MidiConnection {
     return this.device.name || 'Bluetooth MIDI';
   }
 
-  onNote(cb: (e: NoteEvent) => void): () => void {
-    this.noteListeners.add(cb);
+  onInput(cb: (e: MidiInputEvent) => void): () => void {
+    this.inputListeners.add(cb);
     return () => {
-      this.noteListeners.delete(cb);
+      this.inputListeners.delete(cb);
     };
   }
 
@@ -73,7 +73,7 @@ export class BleMidiConnection implements MidiConnection {
     this.characteristic?.removeEventListener('characteristicvaluechanged', this.handleValue);
     this.characteristic = null;
     this.device.gatt?.disconnect();
-    this.noteListeners.clear();
+    this.inputListeners.clear();
     this.disconnectListeners.clear();
   }
 
@@ -107,8 +107,8 @@ export class BleMidiConnection implements MidiConnection {
     const now = performance.now();
     const packet = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
     for (const message of decodeBlePacket(packet)) {
-      const note = decodeMidiMessage(message, now);
-      if (note) for (const cb of this.noteListeners) cb(note);
+      const input = decodeMidiMessage(message, now);
+      if (input) for (const cb of this.inputListeners) cb(input);
     }
   };
 

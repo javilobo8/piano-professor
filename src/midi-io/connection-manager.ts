@@ -1,7 +1,7 @@
 import type { OutputEvent } from '../engine/types';
 import { BleMidiConnection } from './ble-midi';
 import { pickPreferredPort } from './messages';
-import type { ConnectionError, ConnectionStatus, MidiConnection, NoteEvent } from './types';
+import type { ConnectionError, ConnectionStatus, MidiConnection, MidiInputEvent, NoteEvent, PedalEvent } from './types';
 import { WebMidiConnection } from './web-midi';
 
 export class MidiAccessError extends Error {
@@ -55,6 +55,7 @@ export class ConnectionManager {
   private status: ConnectionStatus = { state: 'disconnected', error: null };
   private statusListeners = new Set<(s: ConnectionStatus) => void>();
   private noteListeners = new Set<(e: NoteEvent) => void>();
+  private pedalListeners = new Set<(e: PedalEvent) => void>();
   private access: MIDIAccess | null = null;
   private active: MidiConnection | null = null;
   private activeCleanup: Array<() => void> = [];
@@ -84,6 +85,14 @@ export class ConnectionManager {
     this.noteListeners.add(cb);
     return () => {
       this.noteListeners.delete(cb);
+    };
+  }
+
+  /** Sustain pedal of the piano. */
+  onPedal(cb: (e: PedalEvent) => void): () => void {
+    this.pedalListeners.add(cb);
+    return () => {
+      this.pedalListeners.delete(cb);
     };
   }
 
@@ -182,7 +191,7 @@ export class ConnectionManager {
     this.detach();
     this.active = connection;
     this.activeCleanup = [
-      connection.onNote((e) => this.dispatch(e)),
+      connection.onInput((e) => this.dispatch(e)),
       connection.onDisconnect(() => {
         if (this.active !== connection) return;
         this.detach();
@@ -200,7 +209,11 @@ export class ConnectionManager {
     this.active = null;
   }
 
-  private dispatch(event: NoteEvent): void {
+  private dispatch(event: MidiInputEvent): void {
+    if (event.type === 'pedal') {
+      for (const cb of this.pedalListeners) cb(event);
+      return;
+    }
     for (const cb of this.noteListeners) cb(event);
   }
 

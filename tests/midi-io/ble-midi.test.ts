@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BleMidiConnection } from '../../src/midi-io/ble-midi';
 import { decodeBlePacket, encodeBlePacket } from '../../src/midi-io/ble-packet';
-import type { NoteEvent } from '../../src/midi-io/types';
+import type { MidiInputEvent } from '../../src/midi-io/types';
 
 class FakeCharacteristic extends EventTarget {
   value: DataView | null = null;
@@ -68,12 +68,13 @@ describe('BleMidiConnection', () => {
     const { device, connection } = await open();
     expect(connection.name).toBe('FP-10 BLE');
     expect(device.characteristic.startNotifications).toHaveBeenCalledTimes(1);
-    const notes: NoteEvent[] = [];
-    connection.onNote((e) => notes.push(e));
+    const notes: MidiInputEvent[] = [];
+    connection.onInput((e) => notes.push(e));
     device.characteristic.notify(
       encodeBlePacket(
         [
           [0x90, 60, 127],
+          [0xb0, 64, 127],
           [0x80, 60, 0],
         ],
         1000,
@@ -81,6 +82,7 @@ describe('BleMidiConnection', () => {
     );
     expect(notes).toMatchObject([
       { type: 'on', pitch: 60, velocity: 1 },
+      { type: 'pedal', down: true },
       { type: 'off', pitch: 60 },
     ]);
   });
@@ -141,8 +143,8 @@ describe('BleMidiConnection', () => {
     expect(device.connectAttempts).toBe(2);
     expect(dropped).not.toHaveBeenCalled();
     // Notes flow again after the reconnect.
-    const notes: NoteEvent[] = [];
-    connection.onNote((e) => notes.push(e));
+    const notes: MidiInputEvent[] = [];
+    connection.onInput((e) => notes.push(e));
     device.characteristic.notify(encodeBlePacket([[0x90, 60, 100]], 1));
     expect(notes).toHaveLength(1);
   });

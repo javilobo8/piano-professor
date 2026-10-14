@@ -9,13 +9,24 @@ export interface NoteEvent {
   timeMs: number;
 }
 
+export interface PedalEvent {
+  type: 'pedal';
+  /** Sustain pedal (CC 64) pressed. */
+  down: boolean;
+  /** Same time base as performance.now(). */
+  timeMs: number;
+}
+
+/** What the piano sends us: keys and the sustain pedal. */
+export type MidiInputEvent = NoteEvent | PedalEvent;
+
 export type ConnectionKind = 'usb' | 'ble';
 
 /** A live link to the piano, whatever the transport. */
 export interface MidiConnection {
   readonly kind: ConnectionKind;
   readonly name: string;
-  onNote(cb: (e: NoteEvent) => void): () => void;
+  onInput(cb: (e: MidiInputEvent) => void): () => void;
   onDisconnect(cb: () => void): () => void;
   send(event: OutputEvent): void;
   close(): void;

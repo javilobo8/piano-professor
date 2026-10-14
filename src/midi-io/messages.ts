@@ -1,8 +1,8 @@
 import type { OutputEvent } from '../engine/types';
-import type { NoteEvent } from './types';
+import type { MidiInputEvent } from './types';
 
-/** Note on/off from raw MIDI bytes; anything else (pedal, CC, clock…) is null. */
-export function decodeMidiMessage(data: ArrayLike<number>, timeMs: number): NoteEvent | null {
+/** Note on/off and sustain pedal (CC 64) from raw MIDI bytes; anything else (other CC, clock…) is null. */
+export function decodeMidiMessage(data: ArrayLike<number>, timeMs: number): MidiInputEvent | null {
   if (data.length < 3) return null;
   const type = data[0] & 0xf0;
   if (type === 0x90 && data[2] > 0) {
@@ -10,6 +10,9 @@ export function decodeMidiMessage(data: ArrayLike<number>, timeMs: number): Note
   }
   if (type === 0x80 || type === 0x90) {
     return { type: 'off', pitch: data[1], velocity: 0, timeMs };
+  }
+  if (type === 0xb0 && data[1] === 64) {
+    return { type: 'pedal', down: data[2] >= 64, timeMs };
   }
   return null;
 }
