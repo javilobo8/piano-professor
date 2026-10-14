@@ -48,11 +48,19 @@ class FakeFilter extends FakeNode {
   frequency = new FakeParam(350);
 }
 
+class FakeCompressor extends FakeNode {
+  // Web Audio's defaults.
+  threshold = new FakeParam(-24);
+  knee = new FakeParam(30);
+  ratio = new FakeParam(12);
+}
+
 class FakeContext {
   state = 'running';
   currentTime = 10;
   destination = new FakeNode();
   sources: FakeSource[] = [];
+  compressors: FakeCompressor[] = [];
   resume = vi.fn(async () => {
     this.state = 'running';
   });
@@ -68,7 +76,9 @@ class FakeContext {
     return new FakeFilter();
   }
   createDynamicsCompressor() {
-    return new FakeNode();
+    const compressor = new FakeCompressor();
+    this.compressors.push(compressor);
+    return compressor;
   }
   async decodeAudioData(data: ArrayBuffer) {
     return { name: new TextDecoder().decode(data) };
@@ -123,6 +133,15 @@ describe('WebPiano', () => {
     expect(source.playbackRate.value).toBeCloseTo(2 ** (1 / 12));
     expect(gainOf(source).gain.value).toBeCloseTo(1);
     expect(source.startedAt).toBe(10);
+  });
+
+  it('limits only loud chords, so single notes keep their dynamics', async () => {
+    const { ctx, piano } = setup();
+    await piano.load();
+    const [limiter] = ctx.compressors;
+    // The samples peak at −8 to −19 dBFS: one note at full velocity stays under the threshold.
+    expect(limiter.threshold.value).toBeGreaterThanOrEqual(-8);
+    expect(limiter.knee.value).toBeLessThanOrEqual(6);
   });
 
   it('fades a released note out', async () => {

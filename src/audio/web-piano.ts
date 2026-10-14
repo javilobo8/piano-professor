@@ -133,11 +133,15 @@ export class WebPiano {
   private ensureContext(): AudioContext {
     if (this.ctx) return this.ctx;
     const ctx = this.createContext();
-    const compressor = ctx.createDynamicsCompressor();
-    compressor.connect(ctx.destination);
+    // A limiter for loud chords only: the samples peak at −8 to −19 dBFS, so single notes pass untouched.
+    const limiter = ctx.createDynamicsCompressor();
+    limiter.threshold.value = -8;
+    limiter.knee.value = 6;
+    limiter.ratio.value = 12;
+    limiter.connect(ctx.destination);
     const master = ctx.createGain();
     master.gain.value = MASTER_GAIN;
-    master.connect(compressor);
+    master.connect(limiter);
     this.ctx = ctx;
     this.output = master;
     return ctx;
