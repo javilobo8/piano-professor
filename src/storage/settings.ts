@@ -1,8 +1,22 @@
 import type { SoundTarget } from '../audio/sound-output';
 import type { Mode } from '../engine/types';
 import type { Language, NoteNameSetting } from '../i18n';
+import {
+  ALL_WHITE_KEYS,
+  DEFAULT_SECONDS,
+  MAX_SECONDS,
+  MIN_SECONDS,
+  MIN_WHITE_KEYS,
+  type ViewZoom,
+} from '../render/viewport';
+import { PIANO_HIGH, PIANO_LOW } from '../song/parse';
 
 export type HandChoice = 'right' | 'left' | 'both';
+
+export interface FreePlayView extends ViewZoom {
+  /** Pitch in the middle of the view, so free play reopens where it was. */
+  center: number;
+}
 
 export interface Settings {
   language: Language;
@@ -21,6 +35,10 @@ export interface Settings {
   lastHand: HandChoice;
   /** 0.25–1.5 */
   lastSpeed: number;
+  /** Zoom of the falling-notes screen. */
+  playView: ViewZoom;
+  /** Zoom and position of free play. */
+  freePlayView: FreePlayView;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -36,6 +54,8 @@ export const DEFAULT_SETTINGS: Settings = {
   lastMode: 'wait',
   lastHand: 'right',
   lastSpeed: 1,
+  playView: { whiteKeys: null, seconds: DEFAULT_SECONDS },
+  freePlayView: { whiteKeys: null, seconds: DEFAULT_SECONDS, center: 60 },
 };
 
 const STORAGE_KEY = 'piano-professor.settings';
@@ -56,6 +76,17 @@ const isBool = (v: unknown): v is boolean => typeof v === 'boolean';
 const inRange = (min: number, max: number) => (v: unknown): v is number =>
   typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max;
 
+const isViewZoom = (v: unknown): v is ViewZoom => {
+  if (typeof v !== 'object' || v === null) return false;
+  const { whiteKeys, seconds } = v as Record<string, unknown>;
+  return (
+    (whiteKeys === null || inRange(MIN_WHITE_KEYS, ALL_WHITE_KEYS)(whiteKeys)) &&
+    inRange(MIN_SECONDS, MAX_SECONDS)(seconds)
+  );
+};
+const isFreePlayView = (v: unknown): v is FreePlayView =>
+  isViewZoom(v) && inRange(PIANO_LOW, PIANO_HIGH)((v as unknown as Record<string, unknown>).center);
+
 const validators: { [K in keyof Settings]: (v: unknown) => v is Settings[K] } = {
   language: oneOf<Language>('en', 'es'),
   noteNames: oneOf<NoteNameSetting>('auto', 'letters', 'solfege'),
@@ -69,6 +100,8 @@ const validators: { [K in keyof Settings]: (v: unknown) => v is Settings[K] } = 
   lastMode: oneOf<Mode>('wait', 'tempo'),
   lastHand: oneOf<HandChoice>('right', 'left', 'both'),
   lastSpeed: inRange(0.25, 1.5),
+  playView: isViewZoom,
+  freePlayView: isFreePlayView,
 };
 
 /** Stored settings merged over the defaults; invalid or missing values fall back to defaults. */

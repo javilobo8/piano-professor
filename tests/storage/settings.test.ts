@@ -44,4 +44,45 @@ describe('settings', () => {
     const bad = memoryStorage({ 'piano-professor.settings': JSON.stringify({ soundOutput: 'speakers' }) });
     expect(loadSettings(bad).soundOutput).toBe('piano');
   });
+
+  it("keeps each screen's zoom and falls back to the default when it is invalid", () => {
+    expect(DEFAULT_SETTINGS.playView).toEqual({ whiteKeys: null, seconds: 3 });
+    expect(DEFAULT_SETTINGS.freePlayView).toEqual({ whiteKeys: null, seconds: 3, center: 60 });
+
+    const storage = memoryStorage();
+    saveSettings(
+      {
+        ...DEFAULT_SETTINGS,
+        playView: { whiteKeys: 20.5, seconds: 4 },
+        freePlayView: { whiteKeys: 12, seconds: 2, center: 67 },
+      },
+      storage,
+    );
+    expect(loadSettings(storage)).toMatchObject({
+      playView: { whiteKeys: 20.5, seconds: 4 },
+      freePlayView: { whiteKeys: 12, seconds: 2, center: 67 },
+    });
+
+    const load = (stored: Record<string, unknown>) =>
+      loadSettings(memoryStorage({ 'piano-professor.settings': JSON.stringify(stored) }));
+    const badPlayViews = [
+      null,
+      3,
+      { whiteKeys: 3, seconds: 4 },
+      { whiteKeys: null },
+      { whiteKeys: 60, seconds: 3 },
+      { whiteKeys: null, seconds: 20 },
+    ];
+    for (const playView of badPlayViews) {
+      expect(load({ playView }).playView).toEqual(DEFAULT_SETTINGS.playView);
+    }
+    const badFreePlayViews = [
+      { whiteKeys: null, seconds: 3 },
+      { whiteKeys: null, seconds: 3, center: 200 },
+      { whiteKeys: 'all', seconds: 3, center: 60 },
+    ];
+    for (const freePlayView of badFreePlayViews) {
+      expect(load({ freePlayView }).freePlayView).toEqual(DEFAULT_SETTINGS.freePlayView);
+    }
+  });
 });
