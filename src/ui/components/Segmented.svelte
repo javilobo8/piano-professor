@@ -65,8 +65,9 @@
     white-space: nowrap;
     text-overflow: ellipsis;
   }
+  /* Options grow from their content width, so a longer label gets more room; ellipsis is a last resort. */
   .full button {
-    flex: 1 1 0;
+    flex: 1 1 auto;
     padding: 0 10px;
   }
   button.selected {

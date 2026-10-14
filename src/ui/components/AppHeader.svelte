@@ -14,11 +14,14 @@
     title,
     onback,
     showSettings = true,
+    showConnection = true,
     children,
   }: {
     title?: string;
     onback?: () => void;
     showSettings?: boolean;
+    /** Off where the screen shows the connection itself (Settings). */
+    showConnection?: boolean;
     children?: Snippet;
   } = $props();
 
@@ -45,8 +48,10 @@
 
   <div class="end">
     {@render children?.()}
-    <span class="badge-full"><ConnectionBadge /></span>
-    <span class="badge-compact"><ConnectionBadge compact /></span>
+    {#if showConnection}
+      <span class="badge-full"><ConnectionBadge /></span>
+      <span class="badge-compact"><ConnectionBadge compact /></span>
+    {/if}
     {#if showSettings}
       <button class="icon ghost" onclick={openSettings} aria-label={$t('settings.title')} title={$t('settings.title')}>
         <Settings size={20} aria-hidden="true" />

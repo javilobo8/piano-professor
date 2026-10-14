@@ -37,7 +37,12 @@
 </script>
 
 <main class="screen">
-  <AppHeader title={$t('settings.title')} onback={() => screen.set(back)} showSettings={false} />
+  <AppHeader
+    title={$t('settings.title')}
+    onback={() => screen.set(back)}
+    showSettings={false}
+    showConnection={false}
+  />
 
   <div class="sections">
     <section class="card" aria-labelledby="connection-title">
@@ -185,31 +190,6 @@
     min-width: 0;
   }
 
-  .card-head {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-width: 0;
-  }
-  .card-head h2 {
-    margin: 0;
-    min-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-  .card-icon {
-    flex: none;
-    display: grid;
-    place-items: center;
-    width: 36px;
-    height: 36px;
-    border: 1px solid rgba(124, 92, 255, 0.35);
-    border-radius: var(--radius-sm);
-    background: linear-gradient(135deg, rgba(124, 92, 255, 0.28), rgba(34, 211, 238, 0.16));
-    color: var(--cyan);
-  }
-
   /* The badge keeps its own width; a long device name ellipsises inside it. */
   .status {
     display: flex;
@@ -288,24 +268,6 @@
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
-  }
-
-  .notice {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    margin: 0;
-    padding: 12px 16px;
-    border: 1px solid var(--danger);
-    border-radius: var(--radius);
-    background: rgba(248, 113, 113, 0.08);
-    color: var(--danger);
-    font-size: 14px;
-    font-weight: 600;
-  }
-  .notice > :global(svg) {
-    flex: none;
-    margin-top: -1px;
   }
 
   /* ---------- Tablet and up ---------- */
