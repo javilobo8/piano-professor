@@ -1,101 +1,123 @@
 <script lang="ts">
+  import Maximize2 from '@lucide/svelte/icons/maximize-2';
+  import Minus from '@lucide/svelte/icons/minus';
+  import MoveHorizontal from '@lucide/svelte/icons/move-horizontal';
+  import MoveVertical from '@lucide/svelte/icons/move-vertical';
+  import Plus from '@lucide/svelte/icons/plus';
   import { t } from '../app-state';
   import type { ViewState } from '../view-state';
 
+  /** Zoom controls as an inline section (the View part of the options sheet). */
   let {
     view,
     onzoomkeys,
     onzoomtime,
     onfit,
-    onfollow,
   }: {
     view: ViewState;
     /** 1 = zoom in, -1 = zoom out. */
     onzoomkeys: (direction: 1 | -1) => void;
     onzoomtime: (direction: 1 | -1) => void;
     onfit: () => void;
-    onfollow?: () => void;
   } = $props();
 </script>
 
 <div class="view-controls">
   <div class="row">
-    <span class="axis" aria-hidden="true">↔</span>
-    <button
-      onclick={() => onzoomkeys(-1)}
-      disabled={!view.canZoomKeysOut}
-      aria-label={$t('view.moreKeys')}
-      title={$t('view.moreKeys')}>−</button
-    >
-    <button
-      onclick={() => onzoomkeys(1)}
-      disabled={!view.canZoomKeysIn}
-      aria-label={$t('view.widerKeys')}
-      title={$t('view.widerKeys')}>+</button
-    >
+    <span class="name"><MoveHorizontal size={18} aria-hidden="true" />{$t('view.keys')}</span>
+    <div class="stepper">
+      <button
+        class="icon ghost"
+        onclick={() => onzoomkeys(-1)}
+        disabled={!view.canZoomKeysOut}
+        aria-label={$t('view.moreKeys')}
+        title={$t('view.moreKeys')}
+      >
+        <Minus size={18} aria-hidden="true" />
+      </button>
+      <button
+        class="icon ghost"
+        onclick={() => onzoomkeys(1)}
+        disabled={!view.canZoomKeysIn}
+        aria-label={$t('view.widerKeys')}
+        title={$t('view.widerKeys')}
+      >
+        <Plus size={18} aria-hidden="true" />
+      </button>
+    </div>
   </div>
   <div class="row">
-    <span class="axis" aria-hidden="true">↕</span>
-    <button
-      onclick={() => onzoomtime(-1)}
-      disabled={!view.canZoomTimeOut}
-      aria-label={$t('view.moreTime')}
-      title={$t('view.moreTime')}>−</button
-    >
-    <button
-      onclick={() => onzoomtime(1)}
-      disabled={!view.canZoomTimeIn}
-      aria-label={$t('view.lessTime')}
-      title={$t('view.lessTime')}>+</button
-    >
+    <span class="name"><MoveVertical size={18} aria-hidden="true" />{$t('view.time')}</span>
+    <div class="stepper">
+      <button
+        class="icon ghost"
+        onclick={() => onzoomtime(-1)}
+        disabled={!view.canZoomTimeOut}
+        aria-label={$t('view.moreTime')}
+        title={$t('view.moreTime')}
+      >
+        <Minus size={18} aria-hidden="true" />
+      </button>
+      <button
+        class="icon ghost"
+        onclick={() => onzoomtime(1)}
+        disabled={!view.canZoomTimeIn}
+        aria-label={$t('view.lessTime')}
+        title={$t('view.lessTime')}
+      >
+        <Plus size={18} aria-hidden="true" />
+      </button>
+    </div>
   </div>
-  <button class="wide" onclick={onfit} disabled={!view.canFit}>{$t('view.fit')}</button>
-  {#if view.showFollow && onfollow}
-    <button class="wide primary" onclick={onfollow}>{$t('view.follow')}</button>
-  {/if}
+  <button class="fit" onclick={onfit} disabled={!view.canFit}>
+    <Maximize2 size={18} aria-hidden="true" />
+    {$t('view.fit')}
+  </button>
 </div>
 
 <style>
   .view-controls {
-    position: absolute;
-    top: 12px;
-    right: max(12px, env(safe-area-inset-right));
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 6px;
-    background: rgba(27, 30, 39, 0.8);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    opacity: 0.7;
-    transition: opacity 0.15s;
-  }
-  .view-controls:focus-within,
-  .view-controls:active {
-    opacity: 1;
-  }
-  /* Only where hovering is real: a tap on a touch screen would leave the panel opaque. */
-  @media (hover: hover) {
-    .view-controls:hover {
-      opacity: 1;
-    }
+    gap: 8px;
   }
   .row {
     display: flex;
     align-items: center;
-    gap: 4px;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
   }
-  .axis {
-    width: 20px;
-    text-align: center;
+  .name {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-weight: 600;
+  }
+  .name :global(svg) {
+    flex: none;
     color: var(--text-dim);
   }
-  button {
-    min-height: 44px;
-    min-width: 44px;
-    padding: 0 10px;
+  .stepper {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--surface);
   }
-  .wide {
+  .stepper button {
+    border-radius: var(--radius-pill);
+  }
+  .fit {
     width: 100%;
+    margin-top: 4px;
+    min-height: var(--tap-sm);
   }
 </style>

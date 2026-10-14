@@ -26,6 +26,30 @@
     if (open && e.key === 'Escape') onclose();
   }
 
+  const FOCUSABLE =
+    'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
+
+  /** Keeps Tab / Shift+Tab inside the panel while it is open (it is aria-modal). */
+  function trapTab(e: KeyboardEvent) {
+    if (e.key !== 'Tab') return;
+    const panel = e.currentTarget as HTMLElement;
+    const items = [...panel.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.getClientRects().length > 0);
+    if (items.length === 0) {
+      e.preventDefault();
+      return;
+    }
+    const first = items[0];
+    const last = items[items.length - 1];
+    const active = document.activeElement;
+    if (e.shiftKey && (active === first || active === panel)) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && active === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+
   /** Moves focus into the panel while it is shown and back to the opener when it goes away. */
   function manageFocus(panel: HTMLElement) {
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -46,6 +70,7 @@
     aria-modal="true"
     aria-labelledby={titleId}
     tabindex="-1"
+    onkeydown={trapTab}
     {@attach manageFocus}
   >
     <div class="grab" aria-hidden="true"></div>
@@ -157,7 +182,10 @@
       top: max(64px, calc(env(safe-area-inset-top) + 56px));
       right: max(12px, env(safe-area-inset-right));
       width: 360px;
-      max-height: calc(100dvh - 88px);
+      /* Room below the header row, whatever the top inset, and a bottom margin. */
+      max-height: calc(
+        100dvh - max(64px, env(safe-area-inset-top) + 56px) - max(24px, env(safe-area-inset-bottom) + 12px)
+      );
       border-radius: var(--radius-lg);
       transform-origin: top right;
       animation: pop-in 0.15s ease-out;
