@@ -21,7 +21,8 @@ export const en = {
   'error.midi-unsupported': 'This browser has no MIDI support. Open the app in Chrome.',
   'error.midi-denied':
     'MIDI access is blocked. Allow it in Chrome › Settings › Site settings › MIDI devices (or long-press the app icon › App info › Permissions), then reopen the app.',
-  'error.bluetooth-unsupported': 'Bluetooth is not available. Use Chrome on Android with Bluetooth turned on.',
+  'error.bluetooth-unsupported':
+    'Bluetooth is not available. Turn Bluetooth on and use Chrome or Edge (Firefox, Safari and iPhone/iPad have no Web Bluetooth). On Linux, first enable chrome://flags/#enable-web-bluetooth.',
   'error.bluetooth-failed': 'Could not connect over Bluetooth. Check the piano is on and not connected to another app.',
   'error.invalidMidi': '"{name}" could not be read as MIDI.',
   'error.emptySong': '"{name}" has no notes to play.',

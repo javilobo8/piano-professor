@@ -23,7 +23,8 @@ export const es: Record<MessageKey, string> = {
   'error.midi-unsupported': 'Este navegador no tiene MIDI. Abre la app en Chrome.',
   'error.midi-denied':
     'El acceso MIDI está bloqueado. Permítelo en Chrome › Configuración › Configuración de sitios › Dispositivos MIDI (o mantén pulsado el icono de la app › Información de la app › Permisos) y vuelve a abrir la app.',
-  'error.bluetooth-unsupported': 'Bluetooth no está disponible. Usa Chrome en Android con el Bluetooth activado.',
+  'error.bluetooth-unsupported':
+    'Bluetooth no está disponible. Activa el Bluetooth y usa Chrome o Edge (Firefox, Safari y iPhone/iPad no tienen Web Bluetooth). En Linux, activa antes chrome://flags/#enable-web-bluetooth.',
   'error.bluetooth-failed':
     'No se pudo conectar por Bluetooth. Comprueba que el piano está encendido y no conectado a otra app.',
   'error.invalidMidi': '"{name}" no se puede leer como MIDI.',
