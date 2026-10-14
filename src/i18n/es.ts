@@ -46,10 +46,12 @@ export const es: Record<MessageKey, string> = {
   'library.noScores': 'Sin practicar todavía',
   'library.deleteConfirm': '¿Borrar "{title}" y sus puntuaciones?',
 
+  'setup.practice': 'Práctica',
   'setup.tracks': 'Pistas',
   'setup.track': 'Pista {n}',
   'setup.trackInfo': '{count} notas · {low}–{high}',
   'setup.splitByPitch': 'Separar manos por altura',
+  'setup.splitLabel': 'Punto de corte',
   'setup.splitPoint': 'Mano derecha desde {note} hacia arriba',
   'setup.preview': 'Escuchar',
   'setup.hand': 'Mano',

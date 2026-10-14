@@ -43,10 +43,12 @@ export const en = {
   'library.noScores': 'Not practised yet',
   'library.deleteConfirm': 'Delete "{title}" and its scores?',
 
+  'setup.practice': 'Practice',
   'setup.tracks': 'Tracks',
   'setup.track': 'Track {n}',
   'setup.trackInfo': '{count} notes · {low}–{high}',
   'setup.splitByPitch': 'Split hands by pitch',
+  'setup.splitLabel': 'Split point',
   'setup.splitPoint': 'Right hand from {note} up',
   'setup.preview': 'Listen',
   'setup.hand': 'Hand',

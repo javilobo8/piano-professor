@@ -1,4 +1,11 @@
 <script lang="ts">
+  import CircleAlert from '@lucide/svelte/icons/circle-alert';
+  import Hand from '@lucide/svelte/icons/hand';
+  import Headphones from '@lucide/svelte/icons/headphones';
+  import Music from '@lucide/svelte/icons/music';
+  import Play from '@lucide/svelte/icons/play';
+  import Square from '@lucide/svelte/icons/square';
+  import Volume2 from '@lucide/svelte/icons/volume-2';
   import { onDestroy, onMount } from 'svelte';
   import { practicedRoles } from '../../engine/session';
   import type { Mode } from '../../engine/types';
@@ -7,7 +14,7 @@
   import type { HandChoice } from '../../storage/settings';
   import { saveHandConfig } from '../../storage/songs';
   import { getDb, nameNote, output, screen, settings, t } from '../app-state';
-  import ConnectionBadge from '../components/ConnectionBadge.svelte';
+  import AppHeader from '../components/AppHeader.svelte';
   import Segmented from '../components/Segmented.svelte';
   import SoundOutputField from '../components/SoundOutputField.svelte';
   import { HAND_KEYS, MODE_KEYS, ROLE_KEYS } from '../labels';
@@ -19,6 +26,10 @@
   const ROLES: Role[] = ['right', 'left', 'accompaniment', 'ignore'];
   const HANDS: HandChoice[] = ['right', 'left', 'both'];
   const MODES: Mode[] = ['wait', 'tempo'];
+  const SPEED_MIN = 25;
+  const SPEED_MAX = 150;
+  const SPLIT_MIN = 36;
+  const SPLIT_MAX = 84;
 
   let song = $state<Song | null>(null);
   let handConfig = $state<HandConfig | null>(null);
@@ -94,8 +105,9 @@
     return { low, high };
   }
 
-  function openSettings() {
-    screen.update((current) => ({ name: 'settings', back: current }));
+  /** Position of `value` within [min, max] as a CSS percentage, for the range's gradient fill. */
+  function fill(value: number, min: number, max: number): string {
+    return `${((value - min) / (max - min)) * 100}%`;
   }
 
   function start() {
@@ -116,179 +128,509 @@
   }
 </script>
 
-<main class="screen">
-  <header class="screen-header">
-    <button class="ghost" onclick={() => screen.set({ name: 'library' })} aria-label={$t('common.back')}>←</button>
-    <h1>{song?.title ?? ''}</h1>
-    <ConnectionBadge />
-    <button class="ghost gear" onclick={openSettings} aria-label={$t('settings.title')} title={$t('settings.title')}
-      >⚙</button
-    >
-  </header>
+
+<main class="screen" class:with-bar={!!(song && handConfig)}>
+  <AppHeader title={song?.title ?? ''} onback={() => screen.set({ name: 'library' })} />
 
   {#if failed}
-    <p class="error">{$t('error.songMissing')}</p>
+    <p class="notice" role="alert"><CircleAlert size={20} aria-hidden="true" />{$t('error.songMissing')}</p>
   {:else if song && handConfig}
+    {@const splitNote = $nameNote(draftSplit ?? handConfig.splitPitch)}
     <div class="layout">
-      <section class="card">
-        <h2>{$t('setup.tracks')}</h2>
-        {#if song.tracks.length > 1}
-          <label class="check">
-            <input
-              type="checkbox"
-              checked={handConfig.method === 'split'}
-              onchange={(e) => setSplit(e.currentTarget.checked)}
-            />
-            {$t('setup.splitByPitch')}
-          </label>
-        {/if}
+      <section class="card practice" aria-labelledby="practice-title">
+        <div class="card-head">
+          <span class="card-icon"><Hand size={18} aria-hidden="true" /></span>
+          <h2 id="practice-title">{$t('setup.practice')}</h2>
+        </div>
 
-        {#if handConfig.method === 'split'}
-          <label class="field">
-            <span>{$t('setup.splitPoint', { note: $nameNote(draftSplit ?? handConfig.splitPitch) })}</span>
-            <input
-              type="range"
-              min="36"
-              max="84"
-              value={handConfig.splitPitch}
-              oninput={(e) => (draftSplit = Number(e.currentTarget.value))}
-              onchange={(e) => {
-                draftSplit = null;
-                void updateConfig({ ...handConfig!, splitPitch: Number(e.currentTarget.value) });
-              }}
-            />
-          </label>
-        {:else}
-          <ul class="tracks">
-            {#each song.tracks as track (track.index)}
-              <li>
-                <div class="track-name">
-                  <strong>{track.name || $t('setup.track', { n: track.index + 1 })}</strong>
-                  <span class="dim">
-                    {$t('setup.trackInfo', {
-                      count: track.noteCount,
-                      low: $nameNote(trackRange(track.index).low),
-                      high: $nameNote(trackRange(track.index).high),
-                    })}
-                  </span>
-                </div>
-                <select
-                  value={handConfig.trackRoles[track.index] ?? 'accompaniment'}
-                  onchange={(e) => setTrackRole(track.index, e.currentTarget.value as Role)}
-                >
-                  {#each ROLES as role (role)}
-                    <option value={role}>{$t(ROLE_KEYS[role])}</option>
-                  {/each}
-                </select>
-                <button onclick={() => togglePreview(track.index)}>
-                  {previewing === track.index ? '■' : '▶'}
-                  <span class="sr">{$t('setup.preview')}</span>
-                </button>
-              </li>
-            {/each}
-          </ul>
-        {/if}
-      </section>
-
-      <section class="card options">
         <div class="field">
-          <span>{$t('setup.hand')}</span>
+          <span class="label">{$t('setup.hand')}</span>
           <Segmented
+            full
             label={$t('setup.hand')}
             options={HANDS.map((h) => ({ value: h, label: $t(HAND_KEYS[h]) }))}
             value={hand}
             onchange={(v) => (hand = v)}
           />
         </div>
+
         <div class="field">
-          <span>{$t('setup.mode')}</span>
+          <span class="label">{$t('setup.mode')}</span>
           <Segmented
+            full
             label={$t('setup.mode')}
             options={MODES.map((m) => ({ value: m, label: $t(MODE_KEYS[m]) }))}
             value={mode}
             onchange={(v) => (mode = v)}
           />
-          <small class="dim">{$t(mode === 'wait' ? 'mode.waitHint' : 'mode.tempoHint')}</small>
+          <p class="hint">{$t(mode === 'wait' ? 'mode.waitHint' : 'mode.tempoHint')}</p>
         </div>
+
         <label class="field">
-          <span>{$t('setup.speed')}: {speedPercent}%</span>
-          <input type="range" min="25" max="150" step="5" bind:value={speedPercent} />
+          <span class="field-head">
+            <span class="label">{$t('setup.speed')}</span>
+            <span class="pill value">{speedPercent}%</span>
+          </span>
+          <input
+            type="range"
+            min={SPEED_MIN}
+            max={SPEED_MAX}
+            step="5"
+            bind:value={speedPercent}
+            style:--fill={fill(speedPercent, SPEED_MIN, SPEED_MAX)}
+          />
         </label>
-        <SoundOutputField />
-        <label class="check">
-          <input type="checkbox" bind:checked={$settings.soundOn} />
-          {$t('setup.sound')}
-        </label>
-        <label class="field">
-          <span>{$t('setup.volume')}: {Math.round($settings.volume * 100)}%</span>
-          <input type="range" min="0" max="1" step="0.05" bind:value={$settings.volume} />
-        </label>
+
+        <div class="subsection">
+          <h3 class="label subhead"><Volume2 size={16} aria-hidden="true" />{$t('settings.sound')}</h3>
+          <SoundOutputField />
+          <label class="switch-row">
+            <span>{$t('setup.sound')}</span>
+            <input type="checkbox" class="switch" role="switch" bind:checked={$settings.soundOn} />
+          </label>
+          <label class="field">
+            <span class="field-head">
+              <span class="label">{$t('setup.volume')}</span>
+              <span class="pill value">{Math.round($settings.volume * 100)}%</span>
+            </span>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              bind:value={$settings.volume}
+              style:--fill={fill($settings.volume, 0, 1)}
+            />
+          </label>
+        </div>
+
         {#if !handHasNotes}
-          <p class="error">{$t('setup.noNotesForHand')}</p>
+          <p class="notice" role="alert"><CircleAlert size={20} aria-hidden="true" />{$t('setup.noNotesForHand')}</p>
         {/if}
-        <div class="buttons">
-          <button onclick={listen} disabled={playable.length === 0}>{$t('setup.listen')}</button>
-          <button class="primary" onclick={start} disabled={!handHasNotes}>{$t('setup.start')} ▶</button>
+
+        <div class="actions glass">
+          <button onclick={listen} disabled={playable.length === 0}
+            ><Headphones size={20} aria-hidden="true" /><span>{$t('setup.listen')}</span></button
+          >
+          <button class="primary" onclick={start} disabled={!handHasNotes}
+            ><Play size={20} aria-hidden="true" /><span>{$t('setup.start')}</span></button
+          >
         </div>
+      </section>
+
+      <section class="card tracks-card" aria-labelledby="tracks-title">
+        <div class="card-head">
+          <span class="card-icon"><Music size={18} aria-hidden="true" /></span>
+          <h2 id="tracks-title">{$t('setup.tracks')}</h2>
+        </div>
+
+        {#if song.tracks.length > 1}
+          <label class="switch-row">
+            <span>{$t('setup.splitByPitch')}</span>
+            <input
+              type="checkbox"
+              class="switch"
+              role="switch"
+              checked={handConfig.method === 'split'}
+              onchange={(e) => setSplit(e.currentTarget.checked)}
+            />
+          </label>
+        {/if}
+
+        {#if handConfig.method === 'split'}
+          <div class="field">
+            <label class="field-head" for="split-point">
+              <span class="label">{$t('setup.splitLabel')}</span>
+              <span class="pill value">{splitNote}</span>
+            </label>
+            <input
+              id="split-point"
+              type="range"
+              min={SPLIT_MIN}
+              max={SPLIT_MAX}
+              value={handConfig.splitPitch}
+              aria-describedby="split-hint"
+              style:--fill={fill(draftSplit ?? handConfig.splitPitch, SPLIT_MIN, SPLIT_MAX)}
+              oninput={(e) => (draftSplit = Number(e.currentTarget.value))}
+              onchange={(e) => {
+                draftSplit = null;
+                void updateConfig({ ...handConfig!, splitPitch: Number(e.currentTarget.value) });
+              }}
+            />
+            <p class="hint" id="split-hint">{$t('setup.splitPoint', { note: splitNote })}</p>
+          </div>
+        {:else}
+          <ul class="tracks">
+            {#each song.tracks as track (track.index)}
+              {@const role = handConfig.trackRoles[track.index] ?? 'accompaniment'}
+              {@const name = track.name || $t('setup.track', { n: track.index + 1 })}
+              <li class="track" class:ignored={role === 'ignore'}>
+                <div class="track-name">
+                  <span class="role-dot {role}" aria-hidden="true"></span>
+                  <div class="track-text">
+                    <strong id="track-{track.index}" title={name}>{name}</strong>
+                    <span class="track-info">
+                      {$t('setup.trackInfo', {
+                        count: track.noteCount,
+                        low: $nameNote(trackRange(track.index).low),
+                        high: $nameNote(trackRange(track.index).high),
+                      })}
+                    </span>
+                  </div>
+                </div>
+                <select
+                  value={role}
+                  aria-labelledby="track-{track.index}"
+                  onchange={(e) => setTrackRole(track.index, e.currentTarget.value as Role)}
+                >
+                  {#each ROLES as r (r)}
+                    <option value={r}>{$t(ROLE_KEYS[r])}</option>
+                  {/each}
+                </select>
+                <button
+                  class="icon preview"
+                  class:playing={previewing === track.index}
+                  onclick={() => togglePreview(track.index)}
+                  aria-label={$t('setup.preview')}
+                  title={$t('setup.preview')}
+                  aria-describedby="track-{track.index}"
+                  aria-pressed={previewing === track.index}
+                >
+                  {#if previewing === track.index}
+                    <Square size={16} fill="currentColor" aria-hidden="true" />
+                  {:else}
+                    <Play size={18} aria-hidden="true" />
+                  {/if}
+                </button>
+              </li>
+            {/each}
+          </ul>
+        {/if}
       </section>
     </div>
   {/if}
 </main>
 
 <style>
+  /* ---------- Layout: one column (Practice first), two columns (Tracks | Practice) when wide ---------- */
+
   .layout {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: 16px;
-    align-items: start;
+    margin-top: 8px;
   }
-  h2 {
-    margin: 0 0 12px;
-    font-size: 1.1rem;
-  }
-  .tracks {
-    list-style: none;
-    margin: 0;
-    padding: 0;
+  .card {
     display: grid;
-    gap: 10px;
+    align-content: start;
+    gap: 20px;
+    min-width: 0;
   }
-  .tracks li {
+
+  .card-head {
     display: flex;
     align-items: center;
-    gap: 8px;
-  }
-  .track-name {
-    flex: 1;
+    gap: 12px;
     min-width: 0;
-    display: flex;
-    flex-direction: column;
   }
-  .options {
+  .card-head h2 {
+    margin: 0;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .card-icon {
+    flex: none;
     display: grid;
-    gap: 18px;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid rgba(124, 92, 255, 0.35);
+    border-radius: var(--radius-sm);
+    background: linear-gradient(135deg, rgba(124, 92, 255, 0.28), rgba(34, 211, 238, 0.16));
+    color: var(--cyan);
   }
+
+  /* ---------- Fields ---------- */
+
   .field {
     display: grid;
     gap: 8px;
+    min-width: 0;
   }
-  .check {
+  .field-head {
     display: flex;
     align-items: center;
-    gap: 10px;
-    min-height: var(--tap);
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 24px;
   }
-  .buttons {
+  /* Fixed width so the pill doesn't jump as the digits change. */
+  .value {
+    justify-content: center;
+    min-width: 60px;
+  }
+  /* The range's own 44 px touch area already gives breathing room. */
+  .field input[type='range'] {
+    margin: -6px 0;
+  }
+  .hint {
+    margin: 0;
+    color: var(--text-dim);
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  /* Whole row is the toggle's touch target. */
+  .switch-row {
     display: flex;
-    gap: 10px;
-    justify-content: flex-end;
-    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: var(--tap);
+    cursor: pointer;
   }
-  .sr {
-    position: absolute;
-    width: 1px;
-    height: 1px;
+  .switch-row > span {
+    min-width: 0;
+    font-weight: 600;
+  }
+
+  .subsection {
+    display: grid;
+    gap: 16px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+  .subhead {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    color: var(--text);
+  }
+  .subhead > :global(svg) {
+    color: var(--cyan);
+  }
+
+  .notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 0;
+    padding: 12px 16px;
+    border: 1px solid var(--danger);
+    border-radius: var(--radius);
+    background: rgba(248, 113, 113, 0.08);
+    color: var(--danger);
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .notice > :global(svg) {
+    flex: none;
+    margin-top: -1px;
+  }
+  main > .notice {
+    margin-top: 8px;
+  }
+
+  /* ---------- Actions (bottom of the Practice card; a fixed glass bar on phones) ---------- */
+
+  .actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 4px;
+    padding: 20px 0 0;
+    border: none;
+    border-top: 1px solid var(--border);
+    border-radius: 0;
+    background: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+  .actions button {
+    min-width: 0;
+  }
+  .actions button > span {
+    min-width: 0;
     overflow: hidden;
-    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .actions .primary {
+    min-width: 160px;
+  }
+  /* Optical centring of the play triangle next to its label. */
+  .actions .primary > :global(svg) {
+    margin-left: -2px;
+  }
+
+  /* ---------- Tracks ---------- */
+
+  .tracks {
+    display: grid;
+    margin: -8px 0;
+    padding: 0;
+    list-style: none;
+  }
+  .track {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas: 'name role preview';
+    align-items: center;
+    gap: 8px 12px;
+    padding: 12px 0;
+  }
+  .track + .track {
+    border-top: 1px solid var(--border);
+  }
+  .track-name {
+    grid-area: name;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+  .track-text {
+    display: grid;
+    min-width: 0;
+  }
+  .track-text strong,
+  .track-info {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .track-text strong {
+    font-weight: 700;
+  }
+  .track-info {
+    color: var(--text-dim);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+  .track.ignored .track-text {
+    opacity: 0.5;
+  }
+
+  /* Colour of the role the track plays. */
+  .role-dot {
+    flex: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--text-dim);
+  }
+  .role-dot.right {
+    background: var(--right);
+    box-shadow: 0 0 8px rgba(34, 211, 238, 0.6);
+  }
+  .role-dot.left {
+    background: var(--left);
+    box-shadow: 0 0 8px rgba(167, 139, 250, 0.6);
+  }
+  .role-dot.ignore {
+    background: transparent;
+    border: 1.5px solid var(--text-faint);
+  }
+
+  .track select {
+    grid-area: role;
+    min-width: 0;
+    min-height: var(--tap-sm);
+  }
+  .preview {
+    grid-area: preview;
+    border-radius: 50%;
+  }
+  .preview > :global(svg) {
+    margin-left: 1px;
+  }
+  .preview.playing {
+    background: var(--accent-gradient);
+    background-origin: border-box;
+    border-color: transparent;
+    color: #fff;
+    box-shadow: var(--shadow-glow);
+  }
+  .preview.playing > :global(svg) {
+    margin-left: 0;
+  }
+
+  /* ---------- Tablet and up ---------- */
+
+  @media (min-width: 600px) {
+    .layout {
+      gap: 20px;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .layout {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-areas: 'tracks practice';
+      align-items: start;
+      gap: 24px;
+    }
+    .practice {
+      grid-area: practice;
+    }
+    .tracks-card {
+      grid-area: tracks;
+    }
+  }
+
+  /* ---------- Phone ---------- */
+
+  @media (max-width: 599px) {
+    .layout {
+      gap: 12px;
+    }
+    .card {
+      gap: 16px;
+    }
+    /* Room for the fixed action bar: border + 12 px + button + bottom inset, plus 24 px of air. */
+    .screen.with-bar {
+      padding-bottom: calc(var(--tap) + 37px + max(12px, env(safe-area-inset-bottom)));
+    }
+    .actions {
+      position: fixed;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      z-index: 10;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      margin: 0;
+      padding: 12px max(16px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom))
+        max(16px, env(safe-area-inset-left));
+      border-top: 1px solid var(--border);
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      background: var(--glass);
+      -webkit-backdrop-filter: blur(14px);
+      backdrop-filter: blur(14px);
+      box-shadow: var(--shadow-pop);
+    }
+    .actions button {
+      padding: 0 12px;
+    }
+    .actions .primary {
+      min-width: 0;
+    }
+  }
+
+  /* Very narrow: the role select drops under the track name. */
+  @media (max-width: 399px) {
+    .track {
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas:
+        'name preview'
+        'role role';
+    }
+    .track select {
+      width: 100%;
+    }
   }
 </style>
