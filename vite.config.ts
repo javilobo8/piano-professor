@@ -11,6 +11,10 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
+      workbox: {
+        // The browser piano's samples must work offline too.
+        globPatterns: ['**/*.{js,wasm,css,html,mp3}'],
+      },
       manifest: {
         name: 'Piano Professor',
         short_name: 'Piano Prof',

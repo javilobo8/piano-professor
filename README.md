@@ -6,9 +6,12 @@ Bluetooth MIDI. Built for a Roland FP-10 and an Android tablet running Chrome.
 
 - **Wait mode**: the song stops at each note until you press the right keys.
 - **Tempo mode**: the song keeps its tempo and scores your timing.
-- Practise the right hand, the left hand or both; the piano plays the rest.
+- Practise the right hand, the left hand or both; the piano (or the browser) plays the rest.
 - Speed 25–150 %, A–B loop by bars, best scores per song.
 - **Free play**: no song, just the keyboard: every note you play rises from its key as a bar with its name.
+- **Sound output**: the piano over MIDI, a sampled grand piano in the browser, or both
+  (Settings → Sound output). With the browser on, what you play on the FP-10 (keys and
+  sustain pedal) also sounds there.
 - English and Spanish. Installable PWA that works offline.
 
 ## Using it on the tablet
@@ -25,6 +28,9 @@ Bluetooth MIDI. Built for a Roland FP-10 and an Android tablet running Chrome.
      connect only from the app.
 4. *Add song* → pick a `.mid` file (or add the demo song) → choose hand, mode and speed →
    *Start*.
+5. No piano at hand, or want the sound from the tablet? Settings → *Sound output* →
+   *Browser* (or *Both*). Keys played on the FP-10 still sound on the FP-10 too: turn its
+   volume down to hear only the tablet.
 
 ## Development
 
@@ -55,5 +61,14 @@ Pushing to `main` deploys to GitHub Pages through `.github/workflows/deploy.yml`
 - [ ] Tempo mode: hits, misses and the results screen look right; latency feels immediate.
 - [ ] Speed − / + and the A–B loop work; loop passes show their score.
 - [ ] Pause, seek, back and finishing never leave notes hanging on the piano.
+- [ ] Sound output *Browser*: the other parts, *Listen* and the on-screen keys sound on the
+      tablet; FP-10 keys and the sustain pedal sound on the tablet as well.
+- [ ] Changing the sound output in the middle of a song leaves no notes hanging on either side.
 - [ ] Installed PWA opens full screen in landscape and works in airplane mode.
 - [ ] Spanish: Settings → Language → Español translates every screen.
+
+## Credits
+
+Browser piano samples: [Salamander Grand Piano V3](https://archive.org/details/SalamanderGrandPianoV3)
+by Alexander Holm, CC BY 3.0, through the MP3s published by Tone.js
+(see `public/samples/piano/LICENSE.txt`; regenerate them with `scripts/fetch-piano-samples.sh`).

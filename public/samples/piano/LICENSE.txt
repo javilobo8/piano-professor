@@ -1,0 +1,10 @@
+Salamander Grand Piano V3
+Copyright (c) Alexander Holm
+https://archive.org/details/SalamanderGrandPianoV3
+
+Licensed under the Creative Commons Attribution 3.0 Unported license (CC BY 3.0):
+https://creativecommons.org/licenses/by/3.0/
+
+These files come from the MP3 versions published by Tone.js
+(https://tonejs.github.io/audio/salamander/) and were converted to mono and
+trimmed to 8 seconds with a fade-out by scripts/fetch-piano-samples.sh.
