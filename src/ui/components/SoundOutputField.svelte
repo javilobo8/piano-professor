@@ -11,8 +11,9 @@
 </script>
 
 <div class="field">
-  <span>{$t('settings.soundOutput')}</span>
+  <span class="label">{$t('settings.soundOutput')}</span>
   <Segmented
+    full
     label={$t('settings.soundOutput')}
     options={TARGETS.map((v) => ({ value: v, label: $t(SOUND_OUTPUT_KEYS[v]) }))}
     value={$settings.soundOutput}
@@ -20,7 +21,7 @@
   />
   {#if $settings.soundOutput !== 'piano'}
     {#if $webPianoStatus === 'loading'}
-      <small class="dim">{$t('settings.soundLoading')}</small>
+      <small class="note dim">{$t('settings.soundLoading')}</small>
     {:else if $webPianoStatus === 'error'}
       <div class="retry">
         <span class="error">{$t('settings.soundError')}</span>
@@ -28,7 +29,7 @@
       </div>
     {/if}
     {#if showHint && $settings.soundOutput === 'web'}
-      <small class="dim">{$t('settings.soundWebHint')}</small>
+      <small class="note dim">{$t('settings.soundWebHint')}</small>
     {/if}
   {/if}
 </div>
@@ -37,11 +38,15 @@
   .field {
     display: grid;
     gap: 8px;
+    min-width: 0;
+  }
+  .note {
+    font-size: 13px;
   }
   .retry {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 10px;
+    gap: 8px 12px;
   }
 </style>

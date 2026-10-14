@@ -71,7 +71,7 @@ Pushing to `main` deploys to GitHub Pages through `.github/workflows/deploy.yml`
 - [ ] Sound output *Browser*: the other parts, *Listen* and the on-screen keys sound on the
       tablet; FP-10 keys and the sustain pedal sound on the tablet as well.
 - [ ] Changing the sound output in the middle of a song leaves no notes hanging on either side.
-- [ ] Installed PWA opens full screen in landscape and works in airplane mode.
+- [ ] Installed PWA opens full screen in any orientation and works in airplane mode.
 - [ ] Zoom: pinching sideways and up/down on the notes zooms; while zoomed, Play keeps the
       next notes on screen; dragging stops that and *Follow* brings it back; on-screen keys
       still play the note under the finger; the zoom is still there after reopening.
@@ -82,3 +82,5 @@ Pushing to `main` deploys to GitHub Pages through `.github/workflows/deploy.yml`
 Browser piano samples: [Salamander Grand Piano V3](https://archive.org/details/SalamanderGrandPianoV3)
 by Alexander Holm, CC BY 3.0, through the MP3s published by Tone.js
 (see `public/samples/piano/LICENSE.txt`; regenerate them with `scripts/fetch-piano-samples.sh`).
+
+Icons: [Lucide](https://lucide.dev) (ISC). Font: Plus Jakarta Sans (SIL Open Font License), through Fontsource.

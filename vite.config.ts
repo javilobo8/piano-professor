@@ -12,8 +12,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
       workbox: {
-        // The browser piano's samples must work offline too.
-        globPatterns: ['**/*.{js,wasm,css,html,mp3}'],
+        // The browser piano's samples and the bundled font must work offline too.
+        globPatterns: ['**/*.{js,wasm,css,html,mp3,woff2}'],
       },
       manifest: {
         name: 'Piano Professor',
@@ -22,9 +22,9 @@ export default defineConfig({
         start_url: '.',
         scope: '.',
         display: 'fullscreen',
-        orientation: 'landscape',
-        background_color: '#12141a',
-        theme_color: '#12141a',
+        orientation: 'any',
+        background_color: '#0a0c16',
+        theme_color: '#0a0c16',
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },
