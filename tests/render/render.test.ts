@@ -56,6 +56,18 @@ function recordingContext() {
   const calls: string[] = [];
   const ctx = new Proxy({} as Record<string | symbol, unknown>, {
     get(target, prop) {
+      if (prop === 'createLinearGradient') {
+        return (...args: unknown[]) => {
+          calls.push(`createLinearGradient`);
+          const stops: string[] = [];
+          return {
+            args,
+            stops,
+            addColorStop: (_: number, c: string) => stops.push(c),
+            toString: () => `gradient(${stops.join(',')})`,
+          };
+        };
+      }
       if (prop in target) return target[prop];
       return (...args: unknown[]) => {
         calls.push(`${String(prop)}:${String(target.fillStyle)}`);
@@ -114,9 +126,13 @@ describe('drawFrame', () => {
       showPlayedKeys: false,
     });
     const fills = calls.filter((c) => c.startsWith('fill:'));
-    expect(fills).toEqual(['fill:#4cc36a', 'fill:#3d8bfd']);
-    expect(calls).toContain('fillText:rgba(255, 255, 255, 0.85)');
-    expect(calls).toContain('fillRect:#ef4444');
+    // Practised right hand: halo, note, shine. Faded left hand: no halo, no shine.
+    expect(fills).toEqual(['fill:rgba(34, 211, 238, 0.28)', 'fill:#22d3ee', 'fill:#a78bfa']);
+    const right = calls.indexOf('fill:#22d3ee');
+    expect(calls[right + 1]).toBe('fillRect:rgba(255, 255, 255, 0.35)');
+    expect(calls.filter((c) => c === 'fillRect:rgba(255, 255, 255, 0.35)')).toHaveLength(1);
+    expect(calls).toContain('fillText:rgba(8, 10, 22, 0.8)');
+    expect(calls).toContain('fillRect:#fb7185');
   });
 
   const listening = {
@@ -144,9 +160,9 @@ describe('drawFrame', () => {
       pressed: new Map(),
       showPlayedKeys: true,
     });
-    expect(calls).toContain('fillRect:#4cc36a');
-    expect(calls).toContain('fillRect:#3d8bfd');
-    expect(calls).toContain('fillRect:#6b7280');
+    expect(calls).toContain('fillRect:#22d3ee');
+    expect(calls).toContain('fillRect:#a78bfa');
+    expect(calls).toContain('fillRect:#64748b');
   });
 
   it('does not light keys of notes not sounding yet, hidden accompaniment, or when not asked', () => {
@@ -162,11 +178,11 @@ describe('drawFrame', () => {
         showPlayedKeys: true,
         ...input,
       });
-      return calls.filter((c) => c === 'fillRect:#4cc36a' || c === 'fillRect:#6b7280');
+      return calls.filter((c) => c === 'fillRect:#22d3ee' || c === 'fillRect:#64748b');
     };
     expect(lit({})).toEqual([]);
     expect(lit({ songTime: 1.5, showPlayedKeys: false })).toEqual([]);
-    expect(lit({ songTime: 1.5 })).toEqual(['fillRect:#4cc36a']);
+    expect(lit({ songTime: 1.5 })).toEqual(['fillRect:#22d3ee']);
   });
 
   it('shows a key the player holds over the song note on it', () => {
@@ -179,8 +195,8 @@ describe('drawFrame', () => {
       pressed: new Map([[60, 'neutral']]),
       showPlayedKeys: true,
     });
-    expect(calls).toContain('fillRect:#a78bfa');
-    expect(calls).not.toContain('fillRect:#4cc36a');
+    expect(calls).toContain('fillRect:#e2e8f0');
+    expect(calls).not.toContain('fillRect:#22d3ee');
   });
 
   it('draws only what is inside a scrolled view, and where the view is', () => {
@@ -196,9 +212,9 @@ describe('drawFrame', () => {
       pressed: new Map(),
       showPlayedKeys: false,
     });
-    expect(calls.filter((c) => c.startsWith('fill:'))).toEqual(['fill:#4cc36a']);
-    expect(calls.filter((c) => c === 'fillRect:#f4f4f5')).toHaveLength(26);
-    expect(calls).toContain('fillRect:rgba(255, 255, 255, 0.35)');
+    expect(calls.filter((c) => c.startsWith('fill:'))).toEqual(['fill:rgba(34, 211, 238, 0.28)', 'fill:#22d3ee']);
+    expect(calls.filter((c) => c === 'fillRect:gradient(#eef1fb,#cfd5ea)')).toHaveLength(26);
+    expect(calls).toContain('fillRect:rgba(34, 211, 238, 0.6)');
   });
 
   it('draws no position bar when the whole keyboard fits', () => {
@@ -211,7 +227,45 @@ describe('drawFrame', () => {
       pressed: new Map(),
       showPlayedKeys: false,
     });
-    expect(calls).not.toContain('fillRect:rgba(255, 255, 255, 0.35)');
+    expect(calls).not.toContain('fillRect:rgba(34, 211, 238, 0.6)');
+  });
+
+  it('draws the hit line as a gradient over a glow strip, and shades unlit keys', () => {
+    const { ctx, calls } = recordingContext();
+    drawFrame(ctx, {
+      ...listening,
+      notes: [],
+      songTime: 0,
+      showAccompaniment: true,
+      pressed: new Map(),
+      showPlayedKeys: false,
+    });
+    const glow = calls.indexOf('fillRect:rgba(34, 211, 238, 0.25)');
+    expect(glow).toBeGreaterThan(-1);
+    expect(calls[glow + 1]).toBe('fillRect:gradient(#7c5cff,#22d3ee)');
+    expect(calls).toContain('fillRect:gradient(#eef1fb,#cfd5ea)');
+    expect(calls).toContain('fillRect:gradient(#2b2f45,#1a1d2e)');
+    expect(calls).toContain('fillRect:#9aa3c0');
+  });
+
+  it('creates the keyboard and hit-line gradients once per geometry, not per frame', () => {
+    const { ctx, calls } = recordingContext();
+    const input = {
+      ...listening,
+      notes: [pn(60, 1, 1, 'right')],
+      songTime: 0,
+      showAccompaniment: true,
+      pressed: new Map(),
+      showPlayedKeys: false,
+    };
+    drawFrame(ctx, input);
+    const first = calls.filter((c) => c === 'createLinearGradient').length;
+    drawFrame(ctx, input);
+    drawFrame(ctx, input);
+    expect(first).toBeGreaterThan(0);
+    expect(calls.filter((c) => c === 'createLinearGradient').length).toBe(first);
+    drawFrame(ctx, { ...input, height: 700 });
+    expect(calls.filter((c) => c === 'createLinearGradient').length).toBeGreaterThan(first);
   });
 });
 
@@ -266,10 +320,16 @@ describe('free play', () => {
       noteLabel: () => 'C3',
     });
     const fills = calls.filter((c) => c.startsWith('fill:'));
-    expect(fills).toEqual(['fill:#3d8bfd', 'fill:#4cc36a']);
-    expect(calls).toContain('fillText:rgba(255, 255, 255, 0.85)');
-    expect(calls).toContain('fillRect:#3d8bfd');
-    expect(calls).toContain('fillRect:#4cc36a');
+    expect(fills).toEqual([
+      'fill:rgba(167, 139, 250, 0.30)',
+      'fill:#a78bfa',
+      'fill:rgba(34, 211, 238, 0.28)',
+      'fill:#22d3ee',
+    ]);
+    expect(calls.filter((c) => c === 'fillRect:rgba(255, 255, 255, 0.35)')).toHaveLength(2);
+    expect(calls).toContain('fillText:rgba(8, 10, 22, 0.8)');
+    expect(calls).toContain('fillRect:#a78bfa');
+    expect(calls).toContain('fillRect:#22d3ee');
   });
 
   it('draws only the bars inside a scrolled view', () => {
@@ -287,6 +347,6 @@ describe('free play', () => {
       nowMs: 1000,
       noteLabel: null,
     });
-    expect(calls.filter((c) => c.startsWith('fill:'))).toEqual(['fill:#4cc36a']);
+    expect(calls.filter((c) => c.startsWith('fill:'))).toEqual(['fill:rgba(34, 211, 238, 0.28)', 'fill:#22d3ee']);
   });
 });

@@ -73,6 +73,40 @@ function noteColor(note: PlayableNote, black: boolean): string {
   return black ? COLORS.rightDark : COLORS.right;
 }
 
+/** Halo colour drawn around a practised note of this hand. */
+function noteGlow(role: 'left' | 'right'): string {
+  return role === 'left' ? COLORS.leftGlow : COLORS.rightGlow;
+}
+
+/** Halo 3 px larger on every side (behind the note). No shadowBlur: one extra fill. */
+function drawGlow(ctx: CanvasRenderingContext2D, x: number, top: number, w: number, h: number, glow: string): void {
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.roundRect(x - 3, top - 3, w + 6, h + 6, Math.min(8, w / 3 + 3));
+  ctx.fill();
+}
+
+/** The note body, plus a 2 px shine strip on top when `shine` and the note is tall enough. */
+function drawNoteBody(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  top: number,
+  w: number,
+  h: number,
+  color: string,
+  shine: boolean,
+): void {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.roundRect(x, top, w, h, Math.min(5, w / 3));
+  ctx.fill();
+  if (shine && h >= 8 && w > 4) {
+    ctx.fillStyle = COLORS.noteShine;
+    ctx.fillRect(x + 2, top + 1, w - 4, 2);
+  }
+}
+
 function playedKeyColor(role: PlayRole): string {
   if (role === 'accompaniment') return COLORS.accompaniment;
   return role === 'left' ? COLORS.left : COLORS.right;
@@ -131,11 +165,9 @@ export function drawFrame(ctx: CanvasRenderingContext2D, input: FrameInput): voi
     const bottom = yOf(n.start);
     const h = Math.max(4, bottom - top);
     const faded = n.role === 'accompaniment' || (input.practiced.size > 0 && !input.practiced.has(n.role));
+    if (!faded && n.role !== 'accompaniment') drawGlow(ctx, x + 1, bottom - h, key.width - 2, h, noteGlow(n.role));
     ctx.globalAlpha = n.role === 'accompaniment' ? 0.45 : faded ? 0.35 : 1;
-    ctx.fillStyle = noteColor(n, key.black);
-    ctx.beginPath();
-    ctx.roundRect(x + 1, bottom - h, key.width - 2, h, Math.min(5, key.width / 3));
-    ctx.fill();
+    drawNoteBody(ctx, x + 1, bottom - h, key.width - 2, h, noteColor(n, key.black), !faded);
     if (input.noteLabel && !faded && h >= 16 && key.width >= 12) {
       ctx.fillStyle = COLORS.label;
       ctx.fillText(input.noteLabel(n.pitch), x + key.width / 2, bottom - 3);
@@ -170,8 +202,47 @@ function drawBackground(
   }
 }
 
+interface GradientCache {
+  ctx: CanvasRenderingContext2D;
+  width: number;
+  top: number;
+  height: number;
+  white: CanvasGradient;
+  black: CanvasGradient;
+  hit: CanvasGradient;
+}
+
+/** Keyboard and hit-line gradients, rebuilt only when the canvas or geometry changes. */
+let cache: GradientCache | null = null;
+
+function gradients(ctx: CanvasRenderingContext2D, width: number, g: Geometry): GradientCache {
+  if (
+    cache &&
+    cache.ctx === ctx &&
+    cache.width === width &&
+    cache.top === g.keyboardTop &&
+    cache.height === g.keyboardHeight
+  ) {
+    return cache;
+  }
+  const white = ctx.createLinearGradient(0, g.keyboardTop, 0, g.keyboardTop + g.keyboardHeight);
+  white.addColorStop(0, COLORS.whiteKey);
+  white.addColorStop(1, COLORS.whiteKeyShade);
+  const black = ctx.createLinearGradient(0, g.keyboardTop, 0, g.keyboardTop + g.keyboardHeight * 0.62);
+  black.addColorStop(0, COLORS.blackKeyTop);
+  black.addColorStop(1, COLORS.blackKey);
+  const hit = ctx.createLinearGradient(0, 0, width, 0);
+  hit.addColorStop(0, COLORS.hitLineFrom);
+  hit.addColorStop(1, COLORS.hitLineTo);
+  cache = { ctx, width, top: g.keyboardTop, height: g.keyboardHeight, white, black, hit };
+  return cache;
+}
+
 function drawHitLine(ctx: CanvasRenderingContext2D, width: number, g: Geometry): void {
-  ctx.fillStyle = COLORS.hitLine;
+  const { hit } = gradients(ctx, width, g);
+  ctx.fillStyle = COLORS.hitGlow;
+  ctx.fillRect(0, g.keyboardTop - 6, width, 6);
+  ctx.fillStyle = hit;
   ctx.fillRect(0, g.keyboardTop - 2, width, 2);
 }
 
@@ -186,6 +257,7 @@ function drawKeyboard(
   width: number,
 ): void {
   const blackHeight = g.keyboardHeight * 0.62;
+  const { white, black } = gradients(ctx, width, g);
   for (const k of layout.keys) {
     if (!onScreen(k, scrollX, width)) continue;
     const x = k.x - scrollX;
@@ -194,7 +266,7 @@ function drawKeyboard(
     const role = played.get(k.pitch);
     if (result) ctx.fillStyle = keyColor(result);
     else if (role) ctx.fillStyle = playedKeyColor(role);
-    else ctx.fillStyle = k.black ? COLORS.blackKey : COLORS.whiteKey;
+    else ctx.fillStyle = k.black ? black : white;
     ctx.fillRect(x, g.keyboardTop, k.width, h);
     if (!k.black) {
       ctx.fillStyle = COLORS.whiteKeyEdge;
@@ -267,12 +339,11 @@ export function drawFreePlayFrame(ctx: CanvasRenderingContext2D, input: FreePlay
     const x = key.x - scrollX;
     const { top, bottom } = trailRect(n, nowMs, g);
     const h = bottom - top;
+    drawGlow(ctx, x + 1, top, key.width - 2, h, noteGlow(side));
     ctx.globalAlpha = 0.55 + 0.45 * n.velocity;
-    ctx.fillStyle =
+    const color =
       side === 'left' ? (key.black ? COLORS.leftDark : COLORS.left) : key.black ? COLORS.rightDark : COLORS.right;
-    ctx.beginPath();
-    ctx.roundRect(x + 1, top, key.width - 2, h, Math.min(5, key.width / 3));
-    ctx.fill();
+    drawNoteBody(ctx, x + 1, top, key.width - 2, h, color, true);
     if (input.noteLabel && h >= 16 && key.width >= 12) {
       ctx.fillStyle = COLORS.label;
       ctx.fillText(input.noteLabel(n.pitch), x + key.width / 2, top + 3);
