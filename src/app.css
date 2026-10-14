@@ -35,11 +35,6 @@
   --shadow-pop: 0 20px 40px -16px rgba(0, 0, 0, 0.7);
   --font: 'Plus Jakarta Sans Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
-  /* Aliases for screens that are not restyled yet. */
-  --accent: var(--cyan);
-  --accent-text: #06121a;
-  --ok: var(--success);
-
   color-scheme: dark;
   font-family: var(--font);
   color: var(--text);
@@ -181,13 +176,6 @@ button.icon {
   border-radius: var(--radius-sm);
 }
 
-/* Kept for screens that still use the old text gear button. */
-button.gear {
-  min-width: var(--tap);
-  padding: 0 12px;
-  font-size: 1.3rem;
-}
-
 /* State rules use :where() so component styles can override them at equal specificity. */
 button:where(:active:not(:disabled)) {
   transform: scale(0.97);
@@ -277,7 +265,7 @@ input:where([type='text'], [type='search'], [type='number']):focus {
   border-color: var(--violet);
 }
 
-/* Plain checkbox (screens not restyled yet); toggles use .switch. */
+/* Plain checkbox; toggles use .switch. */
 input[type='checkbox'] {
   accent-color: var(--cyan);
   width: 22px;
@@ -460,26 +448,6 @@ input[type='range']:disabled {
     padding-right: max(32px, env(safe-area-inset-right));
     padding-left: max(32px, env(safe-area-inset-left));
   }
-}
-
-/* Kept for screens not yet moved to AppHeader. */
-.screen-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 56px;
-  padding: max(12px, env(safe-area-inset-top)) 0 12px;
-  margin-bottom: 8px;
-}
-
-.screen-header h1 {
-  flex: 1;
-  min-width: 0;
-  margin: 0;
-  font-size: 24px;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
 .card {

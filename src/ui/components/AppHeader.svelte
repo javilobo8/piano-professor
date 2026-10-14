@@ -8,7 +8,8 @@
 
   /**
    * Top bar of a menu screen, placed first inside `.screen` (which supplies the side insets).
-   * Without `title` it shows the brand; `children` go on the right, before the connection pill.
+   * Without a `title` prop it shows the brand; with one (even empty, while loading) it shows the title.
+   * `children` go on the right, before the connection pill.
    */
   let {
     title,
@@ -37,7 +38,7 @@
     </button>
   {/if}
 
-  {#if title}
+  {#if title !== undefined}
     <h1 class="title" {title}>{title}</h1>
   {:else}
     <div class="brand">
@@ -72,7 +73,7 @@
     flex: 1;
     min-width: 0;
     margin: 0;
-    font-size: 24px;
+    font-size: 28px;
     font-weight: 800;
     letter-spacing: -0.02em;
     overflow: hidden;
@@ -124,7 +125,7 @@
   }
   @media (max-width: 599px) {
     .title {
-      font-size: 20px;
+      font-size: 24px;
     }
     .badge-full {
       display: none;

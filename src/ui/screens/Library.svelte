@@ -7,7 +7,7 @@
   import Play from '@lucide/svelte/icons/play';
   import Plus from '@lucide/svelte/icons/plus';
   import Sparkles from '@lucide/svelte/icons/sparkles';
-  import Trash2 from '@lucide/svelte/icons/trash';
+  import Trash from '@lucide/svelte/icons/trash';
   import X from '@lucide/svelte/icons/x';
   import { onMount } from 'svelte';
   import { buildDemoMidi, DEMO_FILE_NAME } from '../../song/demo';
@@ -113,10 +113,10 @@
 
   function continuePractice() {
     if (!latest) return;
-    screen.set({
-      name: 'play',
-      request: { songId: latest.songId, hand: latest.hand, mode: latest.mode, speed: $settings.lastSpeed },
-    });
+    const { songId, hand, mode } = latest;
+    // Remember what is played, like Setup's start, so Back to Setup shows the same hand and mode.
+    settings.update((s) => ({ ...s, lastHand: hand, lastMode: mode }));
+    screen.set({ name: 'play', request: { songId, hand, mode, speed: $settings.lastSpeed } });
   }
 
   /** A click anywhere on a card opens setup, except on its own buttons and menu. */
@@ -295,7 +295,7 @@
                         ><Pencil size={18} aria-hidden="true" />{$t('common.rename')}</button
                       >
                       <button class="ghost menu-danger" onclick={() => startDelete(song)}
-                        ><Trash2 size={18} aria-hidden="true" />{$t('common.delete')}</button
+                        ><Trash size={18} aria-hidden="true" />{$t('common.delete')}</button
                       >
                     </div>
                   {/if}

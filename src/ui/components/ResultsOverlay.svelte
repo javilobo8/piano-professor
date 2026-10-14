@@ -41,6 +41,11 @@
           { label: 'results.bestStreak', value: score.bestStreak },
         ],
   );
+
+  /** Takes focus when the dialog appears, so keyboard users land on its main action. */
+  function focusOnMount(button: HTMLElement) {
+    button.focus({ preventScroll: true });
+  }
 </script>
 
 <div class="backdrop">
@@ -70,7 +75,7 @@
         <LibraryIcon size={18} aria-hidden="true" />
         {$t('results.back')}
       </button>
-      <button class="primary" onclick={onretry}>
+      <button class="primary" onclick={onretry} {@attach focusOnMount}>
         <RotateCcw size={18} aria-hidden="true" />
         {$t('results.retry')}
       </button>

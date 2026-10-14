@@ -84,7 +84,6 @@ export const es: Record<MessageKey, string> = {
 
   'play.pause': 'Pausa',
   'play.resume': 'Continuar',
-  'play.loop': 'A–B',
   'play.loopFrom': 'A',
   'play.loopTo': 'B',
   'play.loopPass': 'Vuelta {n}: {percent}%',

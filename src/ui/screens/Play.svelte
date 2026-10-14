@@ -283,7 +283,8 @@
     <p class="error message">{$t('error.songMissing')}</p>
   {/if}
 
-  <div class="controls" class:dimmed>
+  <!-- Inert behind the results and listen-end dialogs, so nothing there can be focused or clicked. -->
+  <div class="controls" class:dimmed inert={!!results || listenEnded}>
     <div class="top">
       <div class="glass cluster start">
         <button

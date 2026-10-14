@@ -10,7 +10,7 @@
     value: T;
     onchange: (value: T) => void;
     label: string;
-    /** Stretch to the full width, options in equal parts. */
+    /** Stretch to the full width; options grow from their content width to fill it. */
     full?: boolean;
   } = $props();
 </script>

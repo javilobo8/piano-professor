@@ -4,6 +4,10 @@
   import { t } from '../app-state';
 
   let { onlisten, onpractice }: { onlisten: () => void; onpractice: () => void } = $props();
+  /** Takes focus when the dialog appears, so keyboard users land on its main action. */
+  function focusOnMount(button: HTMLElement) {
+    button.focus({ preventScroll: true });
+  }
 </script>
 
 <div class="backdrop">
@@ -15,7 +19,7 @@
         <Headphones size={18} aria-hidden="true" />
         {$t('listen.again')}
       </button>
-      <button class="primary" onclick={onpractice}>
+      <button class="primary" onclick={onpractice} {@attach focusOnMount}>
         <PlayIcon size={18} fill="currentColor" aria-hidden="true" />
         {$t('listen.practice')}
       </button>

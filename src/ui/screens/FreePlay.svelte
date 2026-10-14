@@ -312,9 +312,17 @@
       font-size: 15px;
     }
   }
+  /* Too narrow to show: visually hidden, still the page heading for assistive tech. */
   @media (max-width: 399px) {
     .title {
-      display: none;
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      padding: 0;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
     }
   }
 </style>

@@ -81,7 +81,6 @@ export const en = {
 
   'play.pause': 'Pause',
   'play.resume': 'Resume',
-  'play.loop': 'A–B',
   'play.loopFrom': 'A',
   'play.loopTo': 'B',
   'play.loopPass': 'Pass {n}: {percent}%',

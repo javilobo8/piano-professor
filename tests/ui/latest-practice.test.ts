@@ -20,4 +20,14 @@ describe('latestPractice', () => {
     const records = [record('a', 'right', [300, 100]), record('b', 'left', [500]), record('a', 'both', [400])];
     expect(latestPractice(records)?.key).toBe('b|left|wait');
   });
+
+  it('ignores a record without runs that comes after one with runs', () => {
+    const records = [record('a', 'right', [300]), record('b', 'left', [])];
+    expect(latestPractice(records)?.key).toBe('a|right|wait');
+  });
+
+  it('keeps the first record when two latest runs share a date', () => {
+    const records = [record('a', 'right', [300]), record('b', 'left', [300])];
+    expect(latestPractice(records)?.key).toBe('a|right|wait');
+  });
 });
