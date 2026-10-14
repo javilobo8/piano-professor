@@ -99,6 +99,8 @@ export const es: Record<MessageKey, string> = {
   'play.loopEndLater': 'Terminar un compás después',
   'play.slower': 'Más lento',
   'play.faster': 'Más rápido',
+  'play.speedLabel': 'Velocidad: {percent} %',
+  'play.handLabel': 'Mano: {hand}',
   'view.moreKeys': 'Más teclas',
   'view.widerKeys': 'Teclas más anchas',
   'view.moreTime': 'Más notas a la vista',

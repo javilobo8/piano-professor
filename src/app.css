@@ -286,8 +286,13 @@ input[type='checkbox'] {
   cursor: pointer;
 }
 
-/* Switch look for a checkbox: <input type="checkbox" class="switch" role="switch" />. */
-input[type='checkbox'].switch {
+/*
+ * Switch look for a checkbox: <input type="checkbox" class="switch" role="switch" />, or for a
+ * button: <button type="button" class="switch" role="switch" aria-checked>. Use the button where
+ * the PC-keyboard piano must keep working after a tap (it ignores keys typed into inputs).
+ */
+input[type='checkbox'].switch,
+button.switch {
   appearance: none;
   -webkit-appearance: none;
   position: relative;
@@ -303,7 +308,8 @@ input[type='checkbox'].switch {
     border-color 0.2s ease;
 }
 
-input[type='checkbox'].switch::before {
+input[type='checkbox'].switch::before,
+button.switch::before {
   content: '';
   position: absolute;
   top: 2px;
@@ -318,19 +324,36 @@ input[type='checkbox'].switch::before {
     background-color 0.2s ease;
 }
 
-input[type='checkbox'].switch:checked {
+input[type='checkbox'].switch:checked,
+button.switch[aria-checked='true'] {
   background: var(--accent-gradient);
   border-color: transparent;
 }
 
-input[type='checkbox'].switch:checked::before {
+input[type='checkbox'].switch:checked::before,
+button.switch[aria-checked='true']::before {
   background: #fff;
   transform: translateX(18px);
 }
 
-input[type='checkbox'].switch:disabled {
+input[type='checkbox'].switch:disabled,
+button.switch:disabled {
   opacity: 0.45;
   cursor: default;
+}
+
+/* The button version drops the base button box and keeps a 44 px tall touch area. */
+button.switch {
+  min-width: 44px;
+  min-height: 26px;
+  padding: 0;
+  transform: none;
+}
+
+button.switch::after {
+  content: '';
+  position: absolute;
+  inset: -10px -4px;
 }
 
 /*

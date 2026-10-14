@@ -84,7 +84,7 @@
       >
         <Minus size={18} aria-hidden="true" />
       </button>
-      <output class="value wide" aria-live="polite">{Math.round(speed * 100)}%</output>
+      <output class="value wide">{Math.round(speed * 100)}%</output>
       <button
         class="icon ghost"
         onclick={() => onspeed(SPEED_STEP)}
@@ -100,15 +100,17 @@
   <section aria-labelledby="{ids}-loop">
     <div class="row">
       <label class="label switch-label" id="{ids}-loop" for="{ids}-loop-switch">{$t('play.loopTitle')}</label>
-      <input
+      <!-- A button, not a checkbox: the PC-keyboard piano ignores keys while an input has focus. -->
+      <button
         id="{ids}-loop-switch"
+        type="button"
         class="switch"
-        type="checkbox"
         role="switch"
-        checked={loop !== null}
+        aria-checked={loop !== null}
+        aria-labelledby="{ids}-loop"
         disabled={!canLoop}
-        onchange={ontoggleloop}
-      />
+        onclick={ontoggleloop}
+      ></button>
     </div>
     {#if loop}
       <div class="row">

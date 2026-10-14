@@ -178,6 +178,11 @@
   });
 
   $effect(() => {
+    // Results and the end of listening are dialogs of their own: never two modal layers at once.
+    if (results || listenEnded) sheetOpen = false;
+  });
+
+  $effect(() => {
     // Dim only while the song plays freely: never while paused, finished or with the sheet open.
     dimmer.setEnabled(controller !== null && status === 'playing' && !sheetOpen && !results && !listenEnded);
   });
@@ -323,7 +328,7 @@
           class="chip"
           onclick={() => (sheetOpen = true)}
           aria-haspopup="dialog"
-          aria-label="{$t('setup.speed')}: {speedPercent}%"
+          aria-label={$t('play.speedLabel', { percent: speedPercent })}
           title={$t('setup.speed')}
         >
           <Gauge size={16} aria-hidden="true" />
@@ -333,7 +338,7 @@
           class="chip"
           onclick={() => (sheetOpen = true)}
           aria-haspopup="dialog"
-          aria-label="{$t('setup.hand')}: {$t(HAND_SHORT_KEYS[hand])}"
+          aria-label={$t('play.handLabel', { hand: $t(HAND_SHORT_KEYS[hand]) })}
           title={$t('setup.hand')}
         >
           {#if hand === 'none'}
@@ -515,10 +520,10 @@
     position: absolute;
     top: 0;
     bottom: 0;
-    background: rgba(251, 191, 36, 0.3);
+    background: rgba(124, 92, 255, 0.35);
     box-shadow:
-      inset 2px 0 0 rgba(251, 191, 36, 0.9),
-      inset -2px 0 0 rgba(251, 191, 36, 0.9);
+      inset 2px 0 0 rgba(167, 139, 250, 0.9),
+      inset -2px 0 0 rgba(167, 139, 250, 0.9);
   }
   /* Full-width rail moved by the progress; its left edge carries the knob. */
   .head {

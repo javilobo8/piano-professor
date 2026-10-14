@@ -96,6 +96,8 @@ export const en = {
   'play.loopEndLater': 'End one bar later',
   'play.slower': 'Slower',
   'play.faster': 'Faster',
+  'play.speedLabel': 'Speed: {percent}%',
+  'play.handLabel': 'Hand: {hand}',
   'view.moreKeys': 'More keys',
   'view.widerKeys': 'Wider keys',
   'view.moreTime': 'More notes ahead',
