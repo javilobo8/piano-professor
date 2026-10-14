@@ -69,6 +69,8 @@ export class PracticeSession {
   private pristine = true;
   /** Song time up to which the auto player has been advanced. */
   private autoTime = 0;
+  /** While the player drags the song: whether it plays on when the drag ends. */
+  private scrubResume: boolean | null = null;
 
   constructor(
     notes: readonly PlayableNote[],
@@ -164,6 +166,30 @@ export class PracticeSession {
     const loop = this.loopBounds();
     if (loop && (target < loop.restart || target >= loop.end)) target = loop.restart;
     this.jumpTo(target);
+  }
+
+  /**
+   * Moves the song by `seconds` as the player drags it. It is held still and silent until
+   * endScrub(). The run no longer counts as complete. Does nothing once the run has finished.
+   */
+  scrub(seconds: number, nowMs: number): void {
+    if (this.scrubResume === null) {
+      this.tick(nowMs);
+      if (this.status === 'finished') return;
+      this.scrubResume = this.status !== 'paused';
+      this.pause(nowMs);
+    }
+    const { min, max } = this.scrubRange();
+    this.pristine = false;
+    // The pause already silenced the piano.
+    this.jumpTo(Math.min(max, Math.max(min, this.songTime + seconds)), false);
+  }
+
+  /** The drag ended: the song plays on if it was playing when the drag started. */
+  endScrub(nowMs: number): void {
+    const resume = this.scrubResume;
+    this.scrubResume = null;
+    if (resume) this.resume(nowMs);
   }
 
   setSpeed(speed: number, nowMs: number): void {
@@ -279,11 +305,11 @@ export class PracticeSession {
     this.songTime = t;
   }
 
-  private jumpTo(t: number): void {
+  private jumpTo(t: number, silence = true): void {
     this.songTime = t;
     this.autoTime = t;
     this.auto.reset(t);
-    this.out.push({ type: 'allNotesOff' });
+    if (silence) this.out.push({ type: 'allNotesOff' });
     this.resetJudges(t);
     if (this.status !== 'paused') this.status = 'playing';
     this.resumeStatus = 'playing';
@@ -295,6 +321,12 @@ export class PracticeSession {
     const end = loop ? loop.end : Infinity;
     this.wait?.reset(start, end);
     this.tempo?.reset(start, end);
+  }
+
+  /** Where a drag can take the song: from the lead-in to the end, or within the active loop. */
+  private scrubRange(): { min: number; max: number } {
+    const loop = this.loopBounds();
+    return loop ? { min: loop.restart, max: loop.end } : { min: Math.min(0, this.startTime), max: this.endTime };
   }
 
   private loopBounds(): LoopBounds | null {

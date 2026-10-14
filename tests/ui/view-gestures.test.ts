@@ -4,8 +4,8 @@ import { ViewGestures, type ViewGestureHandler } from '../../src/ui/view-gesture
 
 type Call = [string, ...number[]];
 
-/** 520 × 600 canvas, 10 px white keys: the keyboard starts at y 516. */
-function setup() {
+/** 520 × 600 canvas, 10 px white keys: the keyboard starts at y 516. Without `scrub`, as in Free play. */
+function setup({ scrub = true }: { scrub?: boolean } = {}) {
   const canvas = Object.assign(new EventTarget(), {
     getBoundingClientRect: () => ({ left: 0, top: 0 }),
     setPointerCapture() {},
@@ -16,6 +16,10 @@ function setup() {
     zoomTime: (factor) => calls.push(['zoomTime', factor]),
     pan: (dx) => calls.push(['pan', dx]),
     commit: () => calls.push(['commit']),
+    ...(scrub && {
+      scrub: (dy: number) => calls.push(['scrub', dy]),
+      endScrub: () => calls.push(['endScrub']),
+    }),
   };
   const layout = layoutKeyboard(21, 108, 520);
   const gestures = new ViewGestures(canvas, () => ({ layout, cssWidth: 520, cssHeight: 600, scrollX: 0 }), handler);
@@ -64,11 +68,42 @@ describe('ViewGestures', () => {
     expect(calls).toEqual([['pan', 10], ['pan', 5], ['commit']]);
   });
 
-  it('ignores vertical one-finger moves', () => {
+  it('drags the song with one finger once it has moved 6 px up or down, without losing that movement', () => {
     const { calls, pointer } = setup();
+    pointer('pointerdown', 1, 100, 100);
+    pointer('pointermove', 1, 102, 104);
+    expect(calls).toEqual([]);
+    pointer('pointermove', 1, 103, 110);
+    // Locked to up and down: sideways movement no longer pans.
+    pointer('pointermove', 1, 130, 115);
+    pointer('pointerup', 1, 130, 115);
+    expect(calls).toEqual([['scrub', 10], ['scrub', 5], ['endScrub'], ['commit']]);
+  });
+
+  it('without a song to drag, ignores up-and-down moves and still pans', () => {
+    const { calls, pointer } = setup({ scrub: false });
     pointer('pointerdown', 1, 100, 100);
     pointer('pointermove', 1, 102, 300);
     expect(calls).toEqual([]);
+    pointer('pointermove', 1, 110, 300);
+    expect(calls).toEqual([['pan', 10]]);
+  });
+
+  it('ends the song drag when a second finger lands, then pinches', () => {
+    const { calls, pointer } = setup();
+    pointer('pointerdown', 1, 100, 100);
+    pointer('pointermove', 1, 100, 120);
+    pointer('pointerdown', 2, 110, 220);
+    pointer('pointermove', 2, 110, 320);
+    expect(calls).toEqual([['scrub', 20], ['endScrub'], ['zoomTime', 0.5]]);
+  });
+
+  it('ends the song drag on pointercancel', () => {
+    const { calls, pointer } = setup();
+    pointer('pointerdown', 1, 100, 100);
+    pointer('pointermove', 1, 100, 120);
+    pointer('pointercancel', 1, 100, 120);
+    expect(calls).toEqual([['scrub', 20], ['endScrub'], ['commit']]);
   });
 
   it('ignores pointers that start on the keyboard', () => {

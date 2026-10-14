@@ -108,6 +108,75 @@ describe('PracticeSession: playback', () => {
   });
 });
 
+describe('PracticeSession: scrubbing', () => {
+  it('holds the song silently while dragged and plays on from there', () => {
+    const s = new PracticeSession([pn(60, 0, 1), pn(64, 3, 1)], MEASURES, config(), 0);
+    s.tick(2500);
+    s.drainOutput();
+    s.scrub(1, 2500);
+    expect(s.getState()).toMatchObject({ status: 'paused', songTime: 1.5 });
+    expect(s.drainOutput()).toEqual([{ type: 'allNotesOff' }]);
+    s.scrub(0.5, 3000);
+    s.tick(5000);
+    expect(s.getState()).toMatchObject({ status: 'paused', songTime: 2 });
+    // The notes were already silenced when the drag started.
+    expect(s.drainOutput()).toEqual([]);
+    s.endScrub(5000);
+    s.tick(6000);
+    expect(s.getState()).toMatchObject({ status: 'playing', songTime: 3 });
+    expect(s.drainOutput()).toEqual([{ type: 'noteOn', pitch: 64, velocity: 102 }]);
+    s.tick(20_000);
+    expect(s.getState()).toMatchObject({ status: 'finished', complete: false });
+  });
+
+  it('stays paused after the drag when it was paused before', () => {
+    const s = new PracticeSession([pn(60, 0, 4)], MEASURES, config(), 0);
+    s.pause(2500);
+    s.scrub(-1, 3000);
+    s.endScrub(3000);
+    s.tick(4000);
+    expect(s.getState()).toMatchObject({ status: 'paused', songTime: -0.5 });
+  });
+
+  it('stops at the start of the lead-in and at the end', () => {
+    const s = new PracticeSession([pn(60, 0, 4)], MEASURES, config(), 0);
+    s.scrub(-100, 0);
+    expect(s.getState().songTime).toBe(-2);
+    s.scrub(100, 0);
+    expect(s.getState().songTime).toBe(5);
+    s.scrub(-1, 0);
+    expect(s.getState().songTime).toBe(4);
+  });
+
+  it('stays inside an active loop', () => {
+    const s = new PracticeSession([pn(60, 0, 8)], MEASURES, config({ loop: { startMeasure: 1, endMeasure: 1 } }), 0);
+    s.scrub(-10, 0);
+    expect(s.getState().songTime).toBe(0);
+    s.scrub(10, 0);
+    expect(s.getState()).toMatchObject({ songTime: 4, loopPass: 0 });
+  });
+
+  it('does nothing once the run has finished', () => {
+    const s = new PracticeSession([pn(60, 0, 1)], MEASURES, config(), 0);
+    s.tick(10_000);
+    s.scrub(-1, 10_000);
+    s.endScrub(10_000);
+    expect(s.getState()).toMatchObject({ status: 'finished', songTime: 2 });
+  });
+
+  it('leaves a waiting step and waits again when played back to it', () => {
+    const s = new PracticeSession([pn(60, 0, 1)], MEASURES, config({ mode: 'wait', practice: 'right' }), 0);
+    s.tick(2500);
+    expect(s.getState()).toMatchObject({ status: 'waiting', songTime: 0 });
+    s.scrub(-1, 2500);
+    expect(s.getState()).toMatchObject({ status: 'paused', songTime: -1 });
+    expect(s.getState().expected.size).toBe(0);
+    s.endScrub(2500);
+    s.tick(4000);
+    expect(s.getState()).toMatchObject({ status: 'waiting', songTime: 0 });
+  });
+});
+
 describe('PracticeSession: A–B loop', () => {
   it('starts one measure before A and wraps back after B', () => {
     const notes = [pn(60, 0.5, 0.5), pn(64, 2.5, 0.5), pn(67, 6.5, 0.5)];

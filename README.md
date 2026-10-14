@@ -8,9 +8,12 @@ Bluetooth MIDI. Built for a Roland FP-10 and an Android tablet running Chrome.
 - **Tempo mode**: the song keeps its tempo and scores your timing.
 - Practise the right hand, the left hand or both; the piano (or the browser) plays the rest.
 - Speed 25–150 %, A–B loop by bars, best scores per song.
+- **Move through the song**: drag the falling notes up or down with one finger or the mouse.
+  The notes follow the finger, and the song is silent while you drag. It plays on when you let
+  go, unless it was paused. With a loop on, the drag stays inside the loop.
 - **Free play**: no song, just the keyboard: every note you play rises from its key as a bar with its name.
 - **Zoom**: pinch the falling notes sideways for wider keys or up and down for more or
-  fewer seconds on screen, drag to look elsewhere, or use the ↔ / ↕ buttons. While zoomed
+  fewer seconds on screen, drag sideways to look elsewhere, or use the ↔ / ↕ buttons. While zoomed
   in, Play follows the notes of the hand you practise; *Follow* brings it back after a drag.
   Each screen remembers its zoom.
 - **Sound output**: the piano over MIDI, a sampled grand piano in the browser, or both
@@ -51,7 +54,8 @@ Without a piano you can play the on-screen keyboard with touch/mouse, or the PC 
 octave.
 
 With a mouse: wheel zooms the time, Ctrl+wheel (or a trackpad pinch) zooms the keys,
-Shift+wheel scrolls sideways, and dragging the notes scrolls too.
+Shift+wheel scrolls sideways. Dragging the notes sideways scrolls too, and dragging them up or
+down moves through the song.
 
 Pushing to `main` deploys to GitHub Pages through `.github/workflows/deploy.yml`
 (enable Pages → Source: *GitHub Actions* in the repository settings).
@@ -68,6 +72,8 @@ Pushing to `main` deploys to GitHub Pages through `.github/workflows/deploy.yml`
 - [ ] Tempo mode: hits, misses and the results screen look right; latency feels immediate.
 - [ ] Speed − / + and the A–B loop work; loop passes show their score.
 - [ ] Pause, seek, back and finishing never leave notes hanging on the piano.
+- [ ] Dragging the notes up or down moves through the song silently and plays on from there
+      when let go; a paused song stays paused; pinching during a drag zooms instead.
 - [ ] Sound output *Browser*: the other parts, *Listen* and the on-screen keys sound on the
       tablet; FP-10 keys and the sustain pedal sound on the tablet as well.
 - [ ] Changing the sound output in the middle of a song leaves no notes hanging on either side.

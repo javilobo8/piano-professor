@@ -5,13 +5,17 @@ import type { KeyboardSurface } from './keyboard-input';
 export interface ViewGestureHandler {
   zoomKeys(factor: number, anchorX: number): void;
   zoomTime(factor: number): void;
-  /** Moves the content by dx canvas pixels, as a drag does. */
+  /** Moves the content by dx canvas pixels, as a sideways drag does. */
   pan(dx: number): void;
+  /** Moves the song by dy canvas pixels, as an up-and-down drag does (down = later). Optional: Play only. */
+  scrub?(dy: number): void;
+  /** The up-and-down drag ended. */
+  endScrub?(): void;
   /** A gesture ended, or the wheel went quiet: save the zoom. */
   commit(): void;
 }
 
-/** Sideways movement before one finger starts panning. */
+/** Movement before one finger starts dragging. */
 const DRAG_THRESHOLD = 6;
 /** A pinch is never measured narrower than this, so the factor cannot explode. */
 const MIN_PINCH_SPAN = 24;
@@ -25,14 +29,15 @@ interface Point {
 }
 
 /**
- * Pinch, drag and wheel over the falling notes as zoom and pan. Pointers that start on
- * the keyboard are left to KeyboardInput.
+ * Pinch, drag and wheel over the falling notes as zoom, pan and moving through the song.
+ * Pointers that start on the keyboard are left to KeyboardInput.
  */
 export class ViewGestures {
   /** Pointers that started over the notes (at most two), at their last used position. */
   private points = new Map<number, Point>();
   private pinchAxis: 'x' | 'y' | null = null;
-  private dragging = false;
+  /** One finger dragging: 'x' pans the keys, 'y' drags the song. */
+  private drag: 'x' | 'y' | null = null;
   private wheelTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
@@ -56,6 +61,7 @@ export class ViewGestures {
     return () => {
       for (const cleanup of cleanups) cleanup();
       this.points.clear();
+      this.drag = null;
       if (this.wheelTimer !== null) {
         clearTimeout(this.wheelTimer);
         this.wheelTimer = null;
@@ -80,7 +86,9 @@ export class ViewGestures {
     e.preventDefault();
     this.canvas.setPointerCapture?.(e.pointerId);
     this.points.set(e.pointerId, p);
-    this.dragging = false;
+    // A second finger turns a song drag into a pinch.
+    if (this.drag === 'y') this.handler.endScrub?.();
+    this.drag = null;
     if (this.points.size === 2) {
       const [a, b] = [...this.points.values()];
       this.pinchAxis = Math.abs(a.x - b.x) >= Math.abs(a.y - b.y) ? 'x' : 'y';
@@ -105,17 +113,23 @@ export class ViewGestures {
       else this.handler.zoomTime(before / after);
       return;
     }
-    // Below the threshold the start point is kept, so no movement is lost once dragging starts.
-    if (!this.dragging && Math.abs(p.x - prev.x) < DRAG_THRESHOLD) return;
-    this.dragging = true;
+    if (!this.drag) {
+      // Below the threshold the start point is kept, so no movement is lost once dragging starts.
+      const dx = Math.abs(p.x - prev.x);
+      const dy = this.handler.scrub ? Math.abs(p.y - prev.y) : 0;
+      if (dx < DRAG_THRESHOLD && dy < DRAG_THRESHOLD) return;
+      this.drag = dy > dx ? 'y' : 'x';
+    }
     this.points.set(e.pointerId, p);
-    if (p.x !== prev.x) this.handler.pan(p.x - prev.x);
+    if (this.drag === 'x' && p.x !== prev.x) this.handler.pan(p.x - prev.x);
+    if (this.drag === 'y' && p.y !== prev.y) this.handler.scrub?.(p.y - prev.y);
   };
 
   private onPointerUp = (e: PointerEvent): void => {
     if (!this.points.delete(e.pointerId)) return;
-    // The finger left after a pinch carries on as a drag from where it is.
-    this.dragging = this.points.size === 1 && this.pinchAxis !== null;
+    if (this.drag === 'y') this.handler.endScrub?.();
+    // The finger left after a pinch carries on panning from where it is.
+    this.drag = this.points.size === 1 && this.pinchAxis !== null ? 'x' : null;
     this.pinchAxis = null;
     this.handler.commit();
   };

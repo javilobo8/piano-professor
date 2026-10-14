@@ -6,7 +6,7 @@ import { PIANO_HIGH, PIANO_LOW } from '../song/parse';
 import type { PlayableNote, PlayRole } from '../song/types';
 import { followTarget } from '../render/follow';
 import { songRange } from '../render/keyboard-layout';
-import { drawFrame, maxNoteDuration } from '../render/renderer';
+import { drawFrame, geometry, maxNoteDuration } from '../render/renderer';
 import { Viewport, ZOOM_STEP, type ViewZoom } from '../render/viewport';
 import { KeyboardInput, type KeyboardSurface } from './keyboard-input';
 import { LocalNotes } from './local-notes';
@@ -94,6 +94,11 @@ export class PlayController {
         this.viewport.panBy(dx);
         this.following = false;
         this.reportView();
+      },
+      scrub: (dy) => this.scrub(dy),
+      endScrub: () => {
+        this.session.endScrub(performance.now());
+        this.flush();
       },
       commit: () => this.commitView(),
     });
@@ -272,6 +277,16 @@ export class PlayController {
   private resumeFollowing(): void {
     this.following = true;
     this.reportView();
+  }
+
+  /** An up-and-down drag over the notes: they follow the finger, so dragging down moves the song on. */
+  private scrub(dy: number): void {
+    if (this.cssWidth === 0) return;
+    const { layout, seconds } = this.viewport;
+    const { pxPerSecond } = geometry(this.cssWidth, this.cssHeight, layout.whiteWidth, seconds);
+    this.session.scrub(dy / pxPerSecond, performance.now());
+    this.flush();
+    this.resumeFollowing();
   }
 
   /** While zoomed and following, glides the view so the next notes of the practised hands stay on screen. */
