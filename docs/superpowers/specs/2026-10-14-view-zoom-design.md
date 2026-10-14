@@ -110,18 +110,19 @@ visibles efectivas, el desplazamiento y los segundos. Expone:
 
 ### 3.3 `render/follow.ts` (puro) — `followTarget`
 
-`followTarget(notes, from, to, roles, layout, songTime, scrollX, viewWidth): number | null`
-devuelve el `scrollX` objetivo, o `null` si no hay que moverse.
+`followTarget(notes, maxDuration, roles, songTime, viewport): number | null` devuelve el
+`scrollX` objetivo, o `null` si no hay que moverse.
 
-1. Candidatas: notas de `[from, to)` (el `visibleRange` del frame) cuyo papel está en
+1. Candidatas: notas en pantalla (el mismo rango que `visibleRange`) cuyo papel está en
    `roles`, que no han terminado (`end > songTime`), en orden de inicio. Las que ya suenan
    van primero.
 2. Se abre un tramo `[izq, der]` con la primera candidata y se amplía con las siguientes
    mientras `der − izq + 2·margen ≤ viewWidth` (margen = 1 tecla blanca). Se para en la
    primera que no cabe.
 3. Si el tramo ya está dentro de `[scrollX + margen, scrollX + viewWidth − margen]`, no se
-   mueve (`null`). Si se sale, se mueve lo mínimo para meterlo. Si el tramo solo (un acorde)
-   no cabe, se centra. El resultado se limita al contenido.
+   mueve (`null`). Si se sale, se mueve lo mínimo para meterlo. Las notas que empiezan a la
+   vez van ordenadas por tono, así que de un acorde más ancho que la vista se ven las más
+   graves. El resultado se limita al contenido.
 
 `roles` son las manos practicadas. Al escuchar (`practice: 'none'`) son derecha e izquierda.
 El acompañamiento nunca se sigue.
@@ -195,6 +196,8 @@ segundos actuales. Deja de importar desde `renderer.ts`.
   interface ViewState {
     canZoomKeysIn: boolean; canZoomKeysOut: boolean;
     canZoomTimeIn: boolean; canZoomTimeOut: boolean;
+    /** Something differs from the whole keyboard at the default seconds. */
+    canFit: boolean;
     /** Play only: show the Follow button. */
     showFollow: boolean;
   }
@@ -236,7 +239,7 @@ segundos actuales. Deja de importar desde `renderer.ts`.
   `centerPitch`.
 - `follow.test.ts`: sin candidatas → `null`; tramo dentro → `null`; movimiento mínimo a
   izquierda y derecha; prioridad por inicio cuando no caben todas; acorde más ancho que la
-  vista → centrado; solo los papeles pedidos; límites del contenido.
+  vista → se ven sus notas más graves; solo los papeles pedidos; límites del contenido.
 - `render.test.ts`: `geometry` y `visibleRange` con segundos; `drawFrame` con `scrollX`
   (translate y descarte de notas fuera); barra de posición solo con zoom.
 - `note-trail.test.ts`: `visible` con segundos.
