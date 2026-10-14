@@ -76,6 +76,12 @@ export const es: Record<MessageKey, string> = {
   'play.loopFrom': 'A',
   'play.loopTo': 'B',
   'play.loopPass': 'Vuelta {n}: {percent}%',
+  'view.moreKeys': 'Más teclas',
+  'view.widerKeys': 'Teclas más anchas',
+  'view.moreTime': 'Más notas a la vista',
+  'view.lessTime': 'Notas más separadas',
+  'view.fit': 'Ajustar',
+  'view.follow': 'Seguir',
 
   'listen.ended': 'Fin de la canción',
   'listen.again': 'Escuchar otra vez',

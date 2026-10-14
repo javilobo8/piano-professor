@@ -73,6 +73,12 @@ export const en = {
   'play.loopFrom': 'A',
   'play.loopTo': 'B',
   'play.loopPass': 'Pass {n}: {percent}%',
+  'view.moreKeys': 'More keys',
+  'view.widerKeys': 'Wider keys',
+  'view.moreTime': 'More notes ahead',
+  'view.lessTime': 'Notes further apart',
+  'view.fit': 'Fit',
+  'view.follow': 'Follow',
 
   'listen.ended': 'End of the song',
   'listen.again': 'Listen again',
