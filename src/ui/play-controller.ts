@@ -3,9 +3,9 @@ import type { LoopRange, SessionConfig, SessionState } from '../engine/types';
 import type { ConnectionManager } from '../midi-io/connection-manager';
 import { PIANO_HIGH, PIANO_LOW } from '../song/parse';
 import type { PlayableNote, PlayRole } from '../song/types';
-import { geometry, drawFrame, maxNoteDuration } from '../render/renderer';
-import { keyAt, layoutKeyboard, songRange, type KeyboardLayout } from '../render/keyboard-layout';
-import { DEFAULT_BASE_PITCH, OCTAVE_DOWN_KEY, OCTAVE_UP_KEY, pcKeyToPitch, shiftOctave } from './pc-keyboard';
+import { drawFrame, maxNoteDuration } from '../render/renderer';
+import { layoutKeyboard, songRange, type KeyboardLayout } from '../render/keyboard-layout';
+import { KeyboardInput } from './keyboard-input';
 import { restartPosition } from './restart-position';
 
 export interface DisplayOptions {
@@ -27,9 +27,6 @@ export class PlayController {
   private readonly maxDuration: number;
   private readonly firstNoteStart: number;
   private practiced: Set<PlayRole>;
-  private pointers = new Map<number, number>();
-  private pcHeld = new Map<string, number>();
-  private basePitch = DEFAULT_BASE_PITCH;
   private cleanups: Array<() => void> = [];
   private display: DisplayOptions;
 
@@ -60,11 +57,12 @@ export class PlayController {
     const resize = new ResizeObserver(() => this.resize());
     resize.observe(this.canvas);
     this.cleanups.push(() => resize.disconnect());
-    this.listen(this.canvas, 'pointerdown', this.onPointerDown);
-    this.listen(this.canvas, 'pointerup', this.onPointerUp);
-    this.listen(this.canvas, 'pointercancel', this.onPointerUp);
-    this.listen(window, 'keydown', this.onKeyDown);
-    this.listen(window, 'keyup', this.onKeyUp);
+    const input = new KeyboardInput(
+      this.canvas,
+      () => (this.layout ? { layout: this.layout, cssWidth: this.cssWidth, cssHeight: this.cssHeight } : null),
+      (type, pitch) => this.virtual(type, pitch),
+    );
+    this.cleanups.push(input.attach());
     // Leaving or closing the app must not leave notes hanging on the piano.
     const onPageHide = () => this.connection.send({ type: 'allNotesOff' });
     window.addEventListener('pagehide', onPageHide);
@@ -187,57 +185,7 @@ export class PlayController {
     });
   }
 
-  private listen<K extends keyof HTMLElementEventMap>(
-    target: HTMLElement | Window,
-    type: K,
-    handler: (e: HTMLElementEventMap[K]) => void,
-  ): void {
-    target.addEventListener(type, handler as EventListener);
-    this.cleanups.push(() => target.removeEventListener(type, handler as EventListener));
-  }
-
   private virtual(type: 'on' | 'off', pitch: number): void {
     this.connection.emitVirtual({ type, pitch, velocity: 0.8, timeMs: performance.now() });
   }
-
-  private onPointerDown = (e: PointerEvent): void => {
-    if (!this.layout) return;
-    const rect = this.canvas.getBoundingClientRect();
-    const { keyboardTop, keyboardHeight } = geometry(this.cssWidth, this.cssHeight, this.layout.whiteWidth);
-    const y = e.clientY - rect.top;
-    if (y < keyboardTop) return;
-    const pitch = keyAt(this.layout, e.clientX - rect.left, y < keyboardTop + keyboardHeight * 0.62);
-    if (pitch === null) return;
-    e.preventDefault();
-    this.canvas.setPointerCapture?.(e.pointerId);
-    this.pointers.set(e.pointerId, pitch);
-    this.virtual('on', pitch);
-  };
-
-  private onPointerUp = (e: PointerEvent): void => {
-    const pitch = this.pointers.get(e.pointerId);
-    if (pitch === undefined) return;
-    this.pointers.delete(e.pointerId);
-    this.virtual('off', pitch);
-  };
-
-  private onKeyDown = (e: KeyboardEvent): void => {
-    if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
-    if (e.code === OCTAVE_DOWN_KEY || e.code === OCTAVE_UP_KEY) {
-      this.basePitch = shiftOctave(this.basePitch, e.code === OCTAVE_UP_KEY ? 1 : -1);
-      return;
-    }
-    const pitch = pcKeyToPitch(e.code, this.basePitch);
-    if (pitch === null || this.pcHeld.has(e.code)) return;
-    this.pcHeld.set(e.code, pitch);
-    this.virtual('on', pitch);
-  };
-
-  private onKeyUp = (e: KeyboardEvent): void => {
-    const pitch = this.pcHeld.get(e.code);
-    if (pitch === undefined) return;
-    this.pcHeld.delete(e.code);
-    this.virtual('off', pitch);
-  };
 }

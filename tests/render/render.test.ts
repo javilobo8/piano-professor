@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { isBlack, keyAt, layoutKeyboard, songRange } from '../../src/render/keyboard-layout';
-import { drawFrame, geometry, maxNoteDuration, visibleRange } from '../../src/render/renderer';
+import type { TrailNote } from '../../src/render/note-trail';
+import {
+  drawFrame,
+  drawFreePlayFrame,
+  freePlaySide,
+  geometry,
+  maxNoteDuration,
+  trailRect,
+  visibleRange,
+} from '../../src/render/renderer';
 import { pn } from '../helpers/make-midi';
 
 describe('keyboard layout', () => {
@@ -14,9 +23,19 @@ describe('keyboard layout', () => {
     expect(layout.keys).toHaveLength(88);
     expect(layout.whiteWidth).toBe(10);
     // C4 is the 24th white key from A0 (A0, B0 + 3 octaves of 7).
-    expect(layout.byPitch.get(60)).toEqual({ pitch: 60, x: 230, width: 10, black: false });
+    expect(layout.byPitch.get(60)).toEqual({
+      pitch: 60,
+      x: 230,
+      width: 10,
+      black: false,
+    });
     // C#4 straddles the C4/D4 boundary.
-    expect(layout.byPitch.get(61)).toEqual({ pitch: 61, x: 237, width: 6, black: true });
+    expect(layout.byPitch.get(61)).toEqual({
+      pitch: 61,
+      x: 237,
+      width: 6,
+      black: true,
+    });
   });
 
   it('lists white keys before black keys', () => {
@@ -42,6 +61,24 @@ describe('keyboard layout', () => {
   });
 });
 
+function recordingContext() {
+  const calls: string[] = [];
+  const ctx = new Proxy({} as Record<string | symbol, unknown>, {
+    get(target, prop) {
+      if (prop in target) return target[prop];
+      return (...args: unknown[]) => {
+        calls.push(`${String(prop)}:${String(target.fillStyle)}`);
+        return prop === 'measureText' ? { width: 10 } : args;
+      };
+    },
+    set(target, prop, value) {
+      target[prop] = value;
+      return true;
+    },
+  });
+  return { ctx: ctx as unknown as CanvasRenderingContext2D, calls };
+}
+
 describe('renderer helpers', () => {
   it('keeps the keyboard between 14% and 26% of the height', () => {
     expect(geometry(1000, 800, 10).keyboardHeight).toBe(112);
@@ -57,24 +94,6 @@ describe('renderer helpers', () => {
 });
 
 describe('drawFrame', () => {
-  function recordingContext() {
-    const calls: string[] = [];
-    const ctx = new Proxy({} as Record<string | symbol, unknown>, {
-      get(target, prop) {
-        if (prop in target) return target[prop];
-        return (...args: unknown[]) => {
-          calls.push(`${String(prop)}:${String(target.fillStyle)}`);
-          return prop === 'measureText' ? { width: 10 } : args;
-        };
-      },
-      set(target, prop, value) {
-        target[prop] = value;
-        return true;
-      },
-    });
-    return { ctx: ctx as unknown as CanvasRenderingContext2D, calls };
-  }
-
   it('draws visible notes in their hand colour and lights pressed keys', () => {
     const { ctx, calls } = recordingContext();
     const notes = [pn(60, 1, 1, 'right'), pn(48, 1, 1, 'left'), pn(55, 1, 1, 'accompaniment')];
@@ -97,5 +116,61 @@ describe('drawFrame', () => {
     expect(fills).toEqual(['fill:#4cc36a', 'fill:#3d8bfd']);
     expect(calls).toContain('fillText:rgba(255, 255, 255, 0.85)');
     expect(calls).toContain('fillRect:#ef4444');
+  });
+});
+
+describe('free play', () => {
+  const g = geometry(800, 600, 10); // keyboardTop 444, 148 px/s
+  const held: TrailNote = {
+    pitch: 60,
+    velocity: 0.5,
+    startMs: 1000,
+    endMs: null,
+  };
+
+  it('grows a held bar upward from the keyboard', () => {
+    expect(trailRect(held, 2000, g)).toEqual({
+      top: g.keyboardTop - g.pxPerSecond,
+      bottom: g.keyboardTop,
+    });
+  });
+
+  it('floats a released bar up at the falling-note speed', () => {
+    const released: TrailNote = { ...held, endMs: 2000 };
+    const r = trailRect(released, 3000, g);
+    expect(r.bottom).toBeCloseTo(g.keyboardTop - g.pxPerSecond);
+    expect(r.top).toBeCloseTo(g.keyboardTop - 2 * g.pxPerSecond);
+  });
+
+  it('keeps bars at least 4 px tall', () => {
+    expect(trailRect({ ...held, startMs: 2000 }, 2000, g)).toEqual({
+      top: g.keyboardTop - 4,
+      bottom: g.keyboardTop,
+    });
+  });
+
+  it('colours by side of middle C', () => {
+    expect(freePlaySide(59)).toBe('left');
+    expect(freePlaySide(60)).toBe('right');
+  });
+
+  it('draws held bars in hand colours, labels them and lights the held key', () => {
+    const { ctx, calls } = recordingContext();
+    drawFreePlayFrame(ctx, {
+      width: 800,
+      height: 600,
+      layout: layoutKeyboard(48, 72, 800),
+      notes: [
+        { pitch: 48, velocity: 1, startMs: 0, endMs: null },
+        { pitch: 64, velocity: 1, startMs: 0, endMs: null },
+      ],
+      nowMs: 1000,
+      noteLabel: () => 'C3',
+    });
+    const fills = calls.filter((c) => c.startsWith('fill:'));
+    expect(fills).toEqual(['fill:#3d8bfd', 'fill:#4cc36a']);
+    expect(calls).toContain('fillText:rgba(255, 255, 255, 0.85)');
+    expect(calls).toContain('fillRect:#3d8bfd');
+    expect(calls).toContain('fillRect:#4cc36a');
   });
 });
