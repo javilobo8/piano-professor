@@ -1,14 +1,17 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
-  import { connection, nameNote, output, screen, t } from '../app-state';
+  import { connection, nameNote, output, screen, settings, t } from '../app-state';
   import ConnectionBadge from '../components/ConnectionBadge.svelte';
+  import ViewControls from '../components/ViewControls.svelte';
   import { FreePlayController } from '../free-play-controller';
+  import { NO_VIEW_STATE, type ViewState } from '../view-state';
 
   let canvas = $state<HTMLCanvasElement>();
   let controller = $state.raw<FreePlayController | null>(null);
   let held = $state<number[]>([]);
   /** The hint goes away for good once anything has been played. */
   let played = $state(false);
+  let view = $state<ViewState>(NO_VIEW_STATE);
   let destroyed = false;
   let wakeLock: WakeLockSentinel | null = null;
 
@@ -47,6 +50,11 @@
       (p: number) => $nameNote(p, false),
       onHeldChange,
       () => (played = true),
+      {
+        zoom: $settings.freePlayView,
+        onChange: (next) => (view = next),
+        onCommit: (zoom) => settings.update((s) => ({ ...s, freePlayView: zoom })),
+      },
     );
     created.start();
     controller = created;
@@ -81,6 +89,14 @@
 
   <div class="stage">
     <canvas bind:this={canvas}></canvas>
+    {#if controller}
+      <ViewControls
+        {view}
+        onzoomkeys={(d) => controller?.zoomKeys(d)}
+        onzoomtime={(d) => controller?.zoomTime(d)}
+        onfit={() => controller?.fit()}
+      />
+    {/if}
     {#if !played}
       <p class="hint dim">{$t('freePlay.hint')}</p>
     {/if}

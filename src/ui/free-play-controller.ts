@@ -1,12 +1,14 @@
 import type { SoundSink } from '../audio/sound-output';
 import type { ConnectionManager } from '../midi-io/connection-manager';
-import { layoutKeyboard, type KeyboardLayout } from '../render/keyboard-layout';
 import { NoteTrail } from '../render/note-trail';
 import { drawFreePlayFrame } from '../render/renderer';
-import { DEFAULT_SECONDS } from '../render/viewport';
+import { Viewport, ZOOM_STEP } from '../render/viewport';
 import { PIANO_HIGH, PIANO_LOW } from '../song/parse';
-import { KeyboardInput } from './keyboard-input';
+import type { FreePlayView } from '../storage/settings';
+import { KeyboardInput, type KeyboardSurface } from './keyboard-input';
 import { LocalNotes } from './local-notes';
+import { ViewGestures } from './view-gestures';
+import { ViewReporter, type ViewOptions } from './view-state';
 
 const TOUCH_VELOCITY = 0.8;
 
@@ -17,7 +19,8 @@ const TOUCH_VELOCITY = 0.8;
 export class FreePlayController {
   private readonly trail = new NoteTrail();
   private frame = 0;
-  private layout: KeyboardLayout | null = null;
+  private readonly viewport: Viewport;
+  private readonly viewReporter: ViewReporter;
   private cssWidth = 0;
   private cssHeight = 0;
   private heldKey = '';
@@ -34,7 +37,12 @@ export class FreePlayController {
     private noteLabel: ((pitch: number) => string) | null,
     private readonly onHeldChange: (held: number[]) => void,
     private readonly onFirstNote: () => void,
-  ) {}
+    private readonly view: ViewOptions<FreePlayView>,
+  ) {
+    this.viewport = new Viewport(PIANO_LOW, PIANO_HIGH, view.zoom);
+    this.viewport.centerOn(view.zoom.center);
+    this.viewReporter = new ViewReporter(view.onChange);
+  }
 
   start(): void {
     this.cleanups.push(
@@ -56,13 +64,17 @@ export class FreePlayController {
     const resize = new ResizeObserver(() => this.resize());
     resize.observe(this.canvas);
     this.cleanups.push(() => resize.disconnect());
-    const input = new KeyboardInput(
-      this.canvas,
-      () => (this.layout ? { layout: this.layout, cssWidth: this.cssWidth, cssHeight: this.cssHeight, scrollX: 0 } : null),
-      (type, pitch) => this.touch(type, pitch),
-    );
+    const surface = () => this.surface();
+    const input = new KeyboardInput(this.canvas, surface, (type, pitch) => this.touch(type, pitch));
     this.input = input;
     this.cleanups.push(input.attach());
+    const gestures = new ViewGestures(this.canvas, surface, {
+      zoomKeys: (factor, anchorX) => this.viewChanged(this.viewport.zoomKeys(factor, anchorX)),
+      zoomTime: (factor) => this.viewChanged(this.viewport.zoomTime(factor)),
+      pan: (dx) => this.viewport.panBy(dx),
+      commit: () => this.commitView(),
+    });
+    this.cleanups.push(gestures.attach());
     // Leaving or closing the app must not leave notes hanging on the piano.
     const onPageHide = () => this.releaseAll();
     window.addEventListener('pagehide', onPageHide);
@@ -94,6 +106,25 @@ export class FreePlayController {
     this.noteLabel = noteLabel;
   }
 
+  /** Zoom buttons: 1 zooms in (wider keys), -1 out. */
+  zoomKeys(direction: 1 | -1): void {
+    this.viewChanged(this.viewport.zoomKeys(direction === 1 ? 1 / ZOOM_STEP : ZOOM_STEP, this.cssWidth / 2));
+    this.commitView();
+  }
+
+  /** Zoom buttons: 1 zooms in (bars rise slower), -1 out. */
+  zoomTime(direction: 1 | -1): void {
+    this.viewChanged(this.viewport.zoomTime(direction === 1 ? 1 / ZOOM_STEP : ZOOM_STEP));
+    this.commitView();
+  }
+
+  /** Back to the 88 keys at the default seconds. */
+  fit(): void {
+    this.viewport.fit();
+    this.viewReporter.report(this.viewport);
+    this.commitView();
+  }
+
   /** Touch and PC-keyboard notes: shown on the trail and sounded through the output (not echoed back). */
   private touch(type: 'on' | 'off', pitch: number): void {
     const now = performance.now();
@@ -122,12 +153,31 @@ export class FreePlayController {
     this.cssHeight = rect.height;
     this.canvas.width = Math.round(rect.width * dpr);
     this.canvas.height = Math.round(rect.height * dpr);
-    this.layout = layoutKeyboard(PIANO_LOW, PIANO_HIGH, rect.width);
+    this.viewport.resize(rect.width);
+    this.viewReporter.report(this.viewport);
+  }
+
+  private surface(): KeyboardSurface | null {
+    if (this.cssWidth === 0) return null;
+    return {
+      layout: this.viewport.layout,
+      cssWidth: this.cssWidth,
+      cssHeight: this.cssHeight,
+      scrollX: this.viewport.scrollX,
+    };
+  }
+
+  private viewChanged(changed: boolean): void {
+    if (changed) this.viewReporter.report(this.viewport);
+  }
+
+  private commitView(): void {
+    this.view.onCommit({ ...this.viewport.zoom(), center: this.viewport.centerPitch() });
   }
 
   private draw(): void {
     const nowMs = performance.now();
-    const notes = this.trail.visible(nowMs, DEFAULT_SECONDS);
+    const notes = this.trail.visible(nowMs, this.viewport.seconds);
     const held = this.trail.held();
     const heldKey = held.join(',');
     if (heldKey !== this.heldKey) {
@@ -135,15 +185,15 @@ export class FreePlayController {
       this.onHeldChange(held);
     }
     const ctx = this.canvas.getContext('2d');
-    if (!ctx || !this.layout || this.cssWidth === 0) return;
+    if (!ctx || this.cssWidth === 0) return;
     const dpr = this.canvas.width / this.cssWidth;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     drawFreePlayFrame(ctx, {
       width: this.cssWidth,
       height: this.cssHeight,
-      layout: this.layout,
-      scrollX: 0,
-      seconds: DEFAULT_SECONDS,
+      layout: this.viewport.layout,
+      scrollX: this.viewport.scrollX,
+      seconds: this.viewport.seconds,
       notes,
       nowMs,
       noteLabel: this.noteLabel,

@@ -4,14 +4,20 @@ import type { LoopRange, SessionConfig, SessionState } from '../engine/types';
 import type { ConnectionManager } from '../midi-io/connection-manager';
 import { PIANO_HIGH, PIANO_LOW } from '../song/parse';
 import type { PlayableNote, PlayRole } from '../song/types';
+import { followTarget } from '../render/follow';
+import { songRange } from '../render/keyboard-layout';
 import { drawFrame, maxNoteDuration } from '../render/renderer';
-import { layoutKeyboard, songRange, type KeyboardLayout } from '../render/keyboard-layout';
-import { DEFAULT_SECONDS } from '../render/viewport';
-import { KeyboardInput } from './keyboard-input';
+import { Viewport, ZOOM_STEP, type ViewZoom } from '../render/viewport';
+import { KeyboardInput, type KeyboardSurface } from './keyboard-input';
 import { LocalNotes } from './local-notes';
 import { restartPosition } from './restart-position';
+import { ViewGestures } from './view-gestures';
+import { ViewReporter, type ViewOptions } from './view-state';
 
 const TOUCH_VELOCITY = 0.8;
+/** How quickly the view glides to the notes it follows (time constant, ms). */
+const FOLLOW_MS = 150;
+const BOTH_HANDS: ReadonlySet<PlayRole> = new Set(['right', 'left']);
 
 export interface DisplayOptions {
   showAccompaniment: boolean;
@@ -20,13 +26,19 @@ export interface DisplayOptions {
 }
 
 /**
- * Runs the play screen: owns the practice session, the animation loop,
- * the canvas, every input source (piano, touch, PC keyboard) and what it sounds.
+ * Runs the play screen: owns the practice session, the animation loop, the canvas and its zoom,
+ * every input source (piano, touch, PC keyboard) and what it sounds.
  */
 export class PlayController {
   private session: PracticeSession;
   private frame = 0;
-  private layout: KeyboardLayout | null = null;
+  private readonly viewport: Viewport;
+  private readonly viewReporter: ViewReporter;
+  /** While zoomed, the view scrolls by itself to the next notes (until the player drags it). */
+  private following = true;
+  /** The first follow jumps straight to the notes instead of gliding there. */
+  private snapFollow = true;
+  private lastFrameMs = 0;
   private cssWidth = 0;
   private cssHeight = 0;
   private readonly maxDuration: number;
@@ -45,12 +57,16 @@ export class PlayController {
     private readonly output: SoundSink,
     display: DisplayOptions,
     private readonly onFrame: (state: SessionState) => void,
+    private readonly view: ViewOptions<ViewZoom>,
   ) {
     this.display = display;
     this.maxDuration = maxNoteDuration(notes);
     this.firstNoteStart = notes.reduce((min, n) => Math.min(min, n.start), Infinity);
     this.practiced = practicedRoles(config.practice);
     this.session = new PracticeSession(notes, measures, this.sessionConfig(), performance.now());
+    const range = this.keyRange();
+    this.viewport = new Viewport(range.low, range.high, view.zoom);
+    this.viewReporter = new ViewReporter(view.onChange);
   }
 
   start(): void {
@@ -64,21 +80,31 @@ export class PlayController {
     const resize = new ResizeObserver(() => this.resize());
     resize.observe(this.canvas);
     this.cleanups.push(() => resize.disconnect());
-    const input = new KeyboardInput(
-      this.canvas,
-      () => (this.layout ? { layout: this.layout, cssWidth: this.cssWidth, cssHeight: this.cssHeight, scrollX: 0 } : null),
-      (type, pitch) => this.virtual(type, pitch),
-    );
+    const surface = () => this.surface();
+    const input = new KeyboardInput(this.canvas, surface, (type, pitch) => this.virtual(type, pitch));
     this.cleanups.push(input.attach());
+    const gestures = new ViewGestures(this.canvas, surface, {
+      zoomKeys: (factor, anchorX) => this.viewChanged(this.viewport.zoomKeys(factor, anchorX)),
+      zoomTime: (factor) => this.viewChanged(this.viewport.zoomTime(factor)),
+      pan: (dx) => {
+        if (!this.viewport.zoomed) return;
+        this.viewport.panBy(dx);
+        this.following = false;
+        this.reportView();
+      },
+      commit: () => this.view.onCommit(this.viewport.zoom()),
+    });
+    this.cleanups.push(gestures.attach());
     // Leaving or closing the app must not leave notes hanging on the piano.
     const onPageHide = () => this.output.send({ type: 'allNotesOff' });
     window.addEventListener('pagehide', onPageHide);
     this.cleanups.push(() => window.removeEventListener('pagehide', onPageHide));
     this.resize();
     const loop = () => {
-      this.session.tick(performance.now());
+      const now = performance.now();
+      this.session.tick(now);
       this.flush();
-      this.draw();
+      this.draw(now);
       this.frame = requestAnimationFrame(loop);
     };
     this.frame = requestAnimationFrame(loop);
@@ -94,7 +120,10 @@ export class PlayController {
   setDisplay(display: DisplayOptions): void {
     const rangeChanged = display.keyboardRange !== this.display.keyboardRange;
     this.display = display;
-    if (rangeChanged) this.resize();
+    if (!rangeChanged) return;
+    const range = this.keyRange();
+    this.viewport.setRange(range.low, range.high);
+    this.reportView();
   }
 
   pause(): void {
@@ -106,9 +135,36 @@ export class PlayController {
     this.session.resume(performance.now());
   }
 
+  /** Zoom buttons: 1 zooms in (wider keys), -1 out. */
+  zoomKeys(direction: 1 | -1): void {
+    this.viewChanged(this.viewport.zoomKeys(direction === 1 ? 1 / ZOOM_STEP : ZOOM_STEP, this.cssWidth / 2));
+    this.view.onCommit(this.viewport.zoom());
+  }
+
+  /** Zoom buttons: 1 zooms in (notes further apart), -1 out (more notes ahead). */
+  zoomTime(direction: 1 | -1): void {
+    this.viewChanged(this.viewport.zoomTime(direction === 1 ? 1 / ZOOM_STEP : ZOOM_STEP));
+    this.view.onCommit(this.viewport.zoom());
+  }
+
+  /** Back to the whole keyboard at the default seconds. */
+  fit(): void {
+    this.viewport.fit();
+    this.following = true;
+    this.reportView();
+    this.view.onCommit(this.viewport.zoom());
+  }
+
+  /** Follows the notes again after the player dragged the view away. */
+  follow(): void {
+    this.following = true;
+    this.reportView();
+  }
+
   seek(songTime: number): void {
     this.session.seek(songTime, performance.now());
     this.flush();
+    this.resumeFollowing();
   }
 
   setSpeed(speed: number): void {
@@ -120,6 +176,7 @@ export class PlayController {
     this.session.setLoop(loop, performance.now());
     this.config = { ...this.config, loop };
     this.flush();
+    this.resumeFollowing();
   }
 
   setSound(soundOn: boolean, volume: number): void {
@@ -142,6 +199,7 @@ export class PlayController {
     this.session = new PracticeSession(this.notes, this.measures, this.sessionConfig(), now);
     if (position !== null && !this.config.loop) this.session.seek(position, now);
     this.flush();
+    this.resumeFollowing();
   }
 
   private get listening(): boolean {
@@ -164,27 +222,68 @@ export class PlayController {
     this.cssHeight = rect.height;
     this.canvas.width = Math.round(rect.width * dpr);
     this.canvas.height = Math.round(rect.height * dpr);
-    const range =
-      this.display.keyboardRange === 'full'
-        ? { low: PIANO_LOW, high: PIANO_HIGH }
-        : songRange(this.notes.map((n) => n.pitch));
-    this.layout = layoutKeyboard(range.low, range.high, rect.width);
+    this.viewport.resize(rect.width);
+    this.reportView();
   }
 
-  private draw(): void {
+  private keyRange(): { low: number; high: number } {
+    return this.display.keyboardRange === 'full'
+      ? { low: PIANO_LOW, high: PIANO_HIGH }
+      : songRange(this.notes.map((n) => n.pitch));
+  }
+
+  private surface(): KeyboardSurface | null {
+    if (this.cssWidth === 0) return null;
+    return {
+      layout: this.viewport.layout,
+      cssWidth: this.cssWidth,
+      cssHeight: this.cssHeight,
+      scrollX: this.viewport.scrollX,
+    };
+  }
+
+  private viewChanged(changed: boolean): void {
+    if (changed) this.reportView();
+  }
+
+  private reportView(): void {
+    this.viewReporter.report(this.viewport, this.viewport.zoomed && !this.following);
+  }
+
+  /** A seek, restart or loop change: the view goes back to following the notes. */
+  private resumeFollowing(): void {
+    this.following = true;
+    this.reportView();
+  }
+
+  /** While zoomed and following, glides the view so the next notes of the practised hands stay on screen. */
+  private followNotes(nowMs: number, songTime: number): void {
+    const dt = nowMs - this.lastFrameMs;
+    this.lastFrameMs = nowMs;
+    if (!this.following || !this.viewport.zoomed || this.cssWidth === 0) return;
+    const roles = this.practiced.size > 0 ? this.practiced : BOTH_HANDS;
+    const target = followTarget(this.notes, this.maxDuration, roles, songTime, this.viewport);
+    if (target === null) return;
+    const x = this.viewport.scrollX;
+    this.viewport.scrollTo(this.snapFollow ? target : x + (target - x) * (1 - Math.exp(-dt / FOLLOW_MS)));
+    this.snapFollow = false;
+  }
+
+  private draw(nowMs: number): void {
     const ctx = this.canvas.getContext('2d');
     const state = this.session.getState();
     this.onFrame(state);
-    if (!ctx || !this.layout || this.cssWidth === 0) return;
+    this.followNotes(nowMs, state.songTime);
+    if (!ctx || this.cssWidth === 0) return;
     const dpr = this.canvas.width / this.cssWidth;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const loop = state.loop;
     drawFrame(ctx, {
       width: this.cssWidth,
       height: this.cssHeight,
-      layout: this.layout,
-      scrollX: 0,
-      seconds: DEFAULT_SECONDS,
+      layout: this.viewport.layout,
+      scrollX: this.viewport.scrollX,
+      seconds: this.viewport.seconds,
       notes: this.notes,
       maxDuration: this.maxDuration,
       songTime: state.songTime,

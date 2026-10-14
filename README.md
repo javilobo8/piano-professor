@@ -9,6 +9,10 @@ Bluetooth MIDI. Built for a Roland FP-10 and an Android tablet running Chrome.
 - Practise the right hand, the left hand or both; the piano (or the browser) plays the rest.
 - Speed 25–150 %, A–B loop by bars, best scores per song.
 - **Free play**: no song, just the keyboard: every note you play rises from its key as a bar with its name.
+- **Zoom**: pinch the falling notes sideways for wider keys or up and down for more or
+  fewer seconds on screen, drag to look elsewhere, or use the ↔ / ↕ buttons. While zoomed
+  in, Play follows the notes of the hand you practise; *Follow* brings it back after a drag.
+  Each screen remembers its zoom.
 - **Sound output**: the piano over MIDI, a sampled grand piano in the browser, or both
   (Settings → Sound output). With the browser on, what you play on the FP-10 (keys and
   sustain pedal) also sounds there.
@@ -45,6 +49,8 @@ npm run build    # production build in dist/
 Without a piano you can play the on-screen keyboard with touch/mouse, or the PC keyboard:
 `A S D F G H J K L ;` are white keys from C4, `W E T Y U O P` black keys, `Z`/`X` change
 octave.
+With a mouse: wheel zooms the time, Ctrl+wheel (or a trackpad pinch) zooms the keys,
+Shift+wheel scrolls sideways, and dragging the notes scrolls too.
 
 Pushing to `main` deploys to GitHub Pages through `.github/workflows/deploy.yml`
 (enable Pages → Source: *GitHub Actions* in the repository settings).
@@ -65,6 +71,9 @@ Pushing to `main` deploys to GitHub Pages through `.github/workflows/deploy.yml`
       tablet; FP-10 keys and the sustain pedal sound on the tablet as well.
 - [ ] Changing the sound output in the middle of a song leaves no notes hanging on either side.
 - [ ] Installed PWA opens full screen in landscape and works in airplane mode.
+- [ ] Zoom: pinching sideways and up/down on the notes zooms; while zoomed, Play keeps the
+      next notes on screen; dragging stops that and *Follow* brings it back; on-screen keys
+      still play the note under the finger; the zoom is still there after reopening.
 - [ ] Spanish: Settings → Language → Español translates every screen.
 
 ## Credits

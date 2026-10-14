@@ -11,10 +11,12 @@
   import ListenEndOverlay from '../components/ListenEndOverlay.svelte';
   import ResultsOverlay from '../components/ResultsOverlay.svelte';
   import Segmented from '../components/Segmented.svelte';
+  import ViewControls from '../components/ViewControls.svelte';
   import { formatDuration, measureAt } from '../format';
   import { HAND_SHORT_KEYS } from '../labels';
   import { PlayController, type DisplayOptions } from '../play-controller';
   import { loadSong } from '../song-loader';
+  import { NO_VIEW_STATE, type ViewState } from '../view-state';
 
   let { request }: { request: PlayRequest } = $props();
 
@@ -41,6 +43,7 @@
   );
   /** True once a listen-only run has played to the end. */
   let listenEnded = $state(false);
+  let view = $state<ViewState>(NO_VIEW_STATE);
   let wakeLock: WakeLockSentinel | null = null;
 
   const measureCount = $derived(song ? song.measures.length - 1 : 0);
@@ -129,6 +132,11 @@
       output,
       display(),
       onFrame,
+      {
+        zoom: $settings.playView,
+        onChange: (next) => (view = next),
+        onCommit: (zoom) => settings.update((s) => ({ ...s, playView: zoom })),
+      },
     );
     created.start();
     controller = created;
@@ -282,6 +290,15 @@
 
   <div class="stage">
     <canvas bind:this={canvas}></canvas>
+    {#if controller}
+      <ViewControls
+        {view}
+        onzoomkeys={(d) => controller?.zoomKeys(d)}
+        onzoomtime={(d) => controller?.zoomTime(d)}
+        onfit={() => controller?.fit()}
+        onfollow={() => controller?.follow()}
+      />
+    {/if}
     {#if failed}
       <p class="error message">{$t('error.songMissing')}</p>
     {/if}
