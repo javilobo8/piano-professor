@@ -5,6 +5,8 @@ export const en = {
   'common.save': 'Save',
   'common.delete': 'Delete',
   'common.rename': 'Rename',
+  'common.close': 'Close',
+  'common.more': 'More options',
 
   'conn.connected': 'Connected · {name}',
   'conn.connecting': 'Connecting…',

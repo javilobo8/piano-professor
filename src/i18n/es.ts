@@ -7,6 +7,8 @@ export const es: Record<MessageKey, string> = {
   'common.save': 'Guardar',
   'common.delete': 'Borrar',
   'common.rename': 'Renombrar',
+  'common.close': 'Cerrar',
+  'common.more': 'Más opciones',
 
   'conn.connected': 'Conectado · {name}',
   'conn.connecting': 'Conectando…',
