@@ -77,10 +77,17 @@ describe('renderer helpers', () => {
     expect(geometry(1000, 800, 30).keyboardHeight).toBe(150);
   });
 
-  it('finds notes visible in the next 3 seconds, including long notes already sounding', () => {
+  it('finds notes visible in the next seconds, including long notes already sounding', () => {
     const notes = [pn(60, 0, 10), pn(62, 4, 1), pn(64, 5, 1), pn(65, 8.5, 1)];
-    expect(visibleRange(notes, 5, maxNoteDuration(notes))).toEqual([0, 3]);
-    expect(visibleRange(notes, 5.6, maxNoteDuration(notes))).toEqual([0, 4]);
+    expect(visibleRange(notes, 5, maxNoteDuration(notes), 3)).toEqual([0, 3]);
+    expect(visibleRange(notes, 5.6, maxNoteDuration(notes), 3)).toEqual([0, 4]);
+    expect(visibleRange(notes, 5, maxNoteDuration(notes), 4)).toEqual([0, 4]);
+    expect(visibleRange(notes, 5.6, maxNoteDuration(notes), 1.5)).toEqual([0, 3]);
+  });
+
+  it('spreads the seconds on screen over the height above the keyboard', () => {
+    expect(geometry(1000, 800, 10).pxPerSecond).toBeCloseTo(688 / 3);
+    expect(geometry(1000, 800, 10, 6).pxPerSecond).toBeCloseTo(688 / 6);
   });
 });
 
@@ -92,6 +99,8 @@ describe('drawFrame', () => {
       width: 800,
       height: 600,
       layout: layoutKeyboard(48, 72, 800),
+      scrollX: 0,
+      seconds: 3,
       notes,
       maxDuration: 1,
       songTime: 0,
@@ -114,6 +123,8 @@ describe('drawFrame', () => {
     width: 800,
     height: 600,
     layout: layoutKeyboard(48, 72, 800),
+    scrollX: 0,
+    seconds: 3,
     maxDuration: 1,
     practiced: new Set<never>(),
     expected: new Set<number>(),
@@ -171,6 +182,37 @@ describe('drawFrame', () => {
     expect(calls).toContain('fillRect:#a78bfa');
     expect(calls).not.toContain('fillRect:#4cc36a');
   });
+
+  it('draws only what is inside a scrolled view, and where the view is', () => {
+    const { ctx, calls } = recordingContext();
+    drawFrame(ctx, {
+      ...listening,
+      width: 520,
+      layout: layoutKeyboard(21, 108, 1040), // 20 px keys, right half on screen
+      scrollX: 520,
+      notes: [pn(36, 0, 1, 'right'), pn(84, 0, 1, 'right')],
+      songTime: -0.5,
+      showAccompaniment: true,
+      pressed: new Map(),
+      showPlayedKeys: false,
+    });
+    expect(calls.filter((c) => c.startsWith('fill:'))).toEqual(['fill:#4cc36a']);
+    expect(calls.filter((c) => c === 'fillRect:#f4f4f5')).toHaveLength(26);
+    expect(calls).toContain('fillRect:rgba(255, 255, 255, 0.35)');
+  });
+
+  it('draws no position bar when the whole keyboard fits', () => {
+    const { ctx, calls } = recordingContext();
+    drawFrame(ctx, {
+      ...listening,
+      notes: [pn(60, 1, 1, 'right')],
+      songTime: 0,
+      showAccompaniment: true,
+      pressed: new Map(),
+      showPlayedKeys: false,
+    });
+    expect(calls).not.toContain('fillRect:rgba(255, 255, 255, 0.35)');
+  });
 });
 
 describe('free play', () => {
@@ -214,6 +256,8 @@ describe('free play', () => {
       width: 800,
       height: 600,
       layout: layoutKeyboard(48, 72, 800),
+      scrollX: 0,
+      seconds: 3,
       notes: [
         { pitch: 48, velocity: 1, startMs: 0, endMs: null },
         { pitch: 64, velocity: 1, startMs: 0, endMs: null },
@@ -226,5 +270,23 @@ describe('free play', () => {
     expect(calls).toContain('fillText:rgba(255, 255, 255, 0.85)');
     expect(calls).toContain('fillRect:#3d8bfd');
     expect(calls).toContain('fillRect:#4cc36a');
+  });
+
+  it('draws only the bars inside a scrolled view', () => {
+    const { ctx, calls } = recordingContext();
+    drawFreePlayFrame(ctx, {
+      width: 520,
+      height: 600,
+      layout: layoutKeyboard(21, 108, 1040),
+      scrollX: 520,
+      seconds: 3,
+      notes: [
+        { pitch: 36, velocity: 1, startMs: 0, endMs: null },
+        { pitch: 84, velocity: 1, startMs: 0, endMs: null },
+      ],
+      nowMs: 1000,
+      noteLabel: null,
+    });
+    expect(calls.filter((c) => c.startsWith('fill:'))).toEqual(['fill:#4cc36a']);
   });
 });

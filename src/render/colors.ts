@@ -17,4 +17,6 @@ export const COLORS = {
   whiteKeyEdge: '#9ca3af',
   blackKey: '#1c1c22',
   label: 'rgba(255, 255, 255, 0.85)',
+  scrollTrack: 'rgba(255, 255, 255, 0.08)',
+  scrollThumb: 'rgba(255, 255, 255, 0.35)',
 } as const;

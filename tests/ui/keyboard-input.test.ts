@@ -6,7 +6,7 @@ function setup() {
   const target = new EventTarget();
   const canvas = { addEventListener() {}, removeEventListener() {} } as unknown as HTMLCanvasElement;
   const events: string[] = [];
-  const surface = () => ({ layout: layoutKeyboard(48, 72, 800), cssWidth: 800, cssHeight: 600 });
+  const surface = () => ({ layout: layoutKeyboard(48, 72, 800), cssWidth: 800, cssHeight: 600, scrollX: 0 });
   const input = new KeyboardInput(canvas, surface, (type, pitch) => events.push(`${type} ${pitch}`), target);
   const detach = input.attach();
   const key = (type: 'keydown' | 'keyup', code: string, repeat = false) =>
@@ -56,6 +56,29 @@ describe('KeyboardInput (PC keys)', () => {
   it('releases everything on cleanup', () => {
     const { events, key, detach } = setup();
     key('keydown', 'KeyA');
+    detach();
+    expect(events).toEqual(['on 60', 'off 60']);
+  });
+});
+
+describe('KeyboardInput (touch)', () => {
+  it('finds the touched key through the scroll offset', () => {
+    const canvas = Object.assign(new EventTarget(), {
+      getBoundingClientRect: () => ({ left: 0, top: 0 }),
+      setPointerCapture() {},
+    }) as unknown as HTMLCanvasElement;
+    const events: string[] = [];
+    const layout = layoutKeyboard(21, 108, 1040); // 20 px white keys; C4 at x 460
+    const input = new KeyboardInput(
+      canvas,
+      () => ({ layout, cssWidth: 520, cssHeight: 600, scrollX: 460 }),
+      (type, pitch) => events.push(`${type} ${pitch}`),
+      new EventTarget(),
+    );
+    const detach = input.attach();
+    // Keyboard top is 500 (100 px keyboard); y 590 is the white-key row.
+    canvas.dispatchEvent(Object.assign(new Event('pointerdown'), { pointerId: 1, clientX: 10, clientY: 590 }));
+    canvas.dispatchEvent(Object.assign(new Event('pointerup'), { pointerId: 1, clientX: 10, clientY: 590 }));
     detach();
     expect(events).toEqual(['on 60', 'off 60']);
   });

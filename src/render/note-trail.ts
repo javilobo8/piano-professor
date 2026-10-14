@@ -1,5 +1,3 @@
-import { VISIBLE_SECONDS } from './renderer';
-
 export interface TrailNote {
   pitch: number;
   /** 0–1 */
@@ -38,9 +36,9 @@ export class NoteTrail {
     return [...this.open.keys()].sort((a, b) => a - b);
   }
 
-  /** Notes still on screen at nowMs (drops released notes that have risen off the top). */
-  visible(nowMs: number): readonly TrailNote[] {
-    const limit = nowMs - VISIBLE_SECONDS * 1000;
+  /** Notes still on screen at nowMs with `seconds` shown (drops released notes that have risen off the top). */
+  visible(nowMs: number, seconds: number): readonly TrailNote[] {
+    const limit = nowMs - seconds * 1000;
     let kept = 0;
     for (const n of this.notes) if (n.endMs === null || n.endMs > limit) this.notes[kept++] = n;
     this.notes.length = kept;

@@ -6,6 +6,7 @@ import { PIANO_HIGH, PIANO_LOW } from '../song/parse';
 import type { PlayableNote, PlayRole } from '../song/types';
 import { drawFrame, maxNoteDuration } from '../render/renderer';
 import { layoutKeyboard, songRange, type KeyboardLayout } from '../render/keyboard-layout';
+import { DEFAULT_SECONDS } from '../render/viewport';
 import { KeyboardInput } from './keyboard-input';
 import { LocalNotes } from './local-notes';
 import { restartPosition } from './restart-position';
@@ -65,7 +66,7 @@ export class PlayController {
     this.cleanups.push(() => resize.disconnect());
     const input = new KeyboardInput(
       this.canvas,
-      () => (this.layout ? { layout: this.layout, cssWidth: this.cssWidth, cssHeight: this.cssHeight } : null),
+      () => (this.layout ? { layout: this.layout, cssWidth: this.cssWidth, cssHeight: this.cssHeight, scrollX: 0 } : null),
       (type, pitch) => this.virtual(type, pitch),
     );
     this.cleanups.push(input.attach());
@@ -182,6 +183,8 @@ export class PlayController {
       width: this.cssWidth,
       height: this.cssHeight,
       layout: this.layout,
+      scrollX: 0,
+      seconds: DEFAULT_SECONDS,
       notes: this.notes,
       maxDuration: this.maxDuration,
       songTime: state.songTime,

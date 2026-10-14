@@ -6,6 +6,8 @@ export interface KeyboardSurface {
   layout: KeyboardLayout;
   cssWidth: number;
   cssHeight: number;
+  /** Content pixels scrolled off the left edge of the canvas. */
+  scrollX: number;
 }
 
 function isFormField(target: EventTarget | null): boolean {
@@ -58,12 +60,12 @@ export class KeyboardInput {
   private onPointerDown = (e: PointerEvent): void => {
     const surface = this.surface();
     if (!surface) return;
-    const { layout, cssWidth, cssHeight } = surface;
+    const { layout, cssWidth, cssHeight, scrollX } = surface;
     const rect = this.canvas.getBoundingClientRect();
     const { keyboardTop, keyboardHeight } = geometry(cssWidth, cssHeight, layout.whiteWidth);
     const y = e.clientY - rect.top;
     if (y < keyboardTop) return;
-    const pitch = keyAt(layout, e.clientX - rect.left, y < keyboardTop + keyboardHeight * 0.62);
+    const pitch = keyAt(layout, e.clientX - rect.left + scrollX, y < keyboardTop + keyboardHeight * 0.62);
     if (pitch === null) return;
     e.preventDefault();
     this.canvas.setPointerCapture?.(e.pointerId);

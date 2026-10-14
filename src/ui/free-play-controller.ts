@@ -3,6 +3,7 @@ import type { ConnectionManager } from '../midi-io/connection-manager';
 import { layoutKeyboard, type KeyboardLayout } from '../render/keyboard-layout';
 import { NoteTrail } from '../render/note-trail';
 import { drawFreePlayFrame } from '../render/renderer';
+import { DEFAULT_SECONDS } from '../render/viewport';
 import { PIANO_HIGH, PIANO_LOW } from '../song/parse';
 import { KeyboardInput } from './keyboard-input';
 import { LocalNotes } from './local-notes';
@@ -57,7 +58,7 @@ export class FreePlayController {
     this.cleanups.push(() => resize.disconnect());
     const input = new KeyboardInput(
       this.canvas,
-      () => (this.layout ? { layout: this.layout, cssWidth: this.cssWidth, cssHeight: this.cssHeight } : null),
+      () => (this.layout ? { layout: this.layout, cssWidth: this.cssWidth, cssHeight: this.cssHeight, scrollX: 0 } : null),
       (type, pitch) => this.touch(type, pitch),
     );
     this.input = input;
@@ -126,7 +127,7 @@ export class FreePlayController {
 
   private draw(): void {
     const nowMs = performance.now();
-    const notes = this.trail.visible(nowMs);
+    const notes = this.trail.visible(nowMs, DEFAULT_SECONDS);
     const held = this.trail.held();
     const heldKey = held.join(',');
     if (heldKey !== this.heldKey) {
@@ -141,6 +142,8 @@ export class FreePlayController {
       width: this.cssWidth,
       height: this.cssHeight,
       layout: this.layout,
+      scrollX: 0,
+      seconds: DEFAULT_SECONDS,
       notes,
       nowMs,
       noteLabel: this.noteLabel,
