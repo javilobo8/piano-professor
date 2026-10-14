@@ -1,13 +1,13 @@
 import { PracticeSession } from '../engine/session';
-import type { ConnectionManager } from '../midi-io/connection-manager';
+import type { SoundSink } from '../audio/sound-output';
 import type { PlayableNote } from '../song/types';
 
-/** Plays notes on the piano without judging (song or single-track preview). */
+/** Plays notes without judging (song or single-track preview) through the sound output. */
 export class Previewer {
   private session: PracticeSession | null = null;
   private frame = 0;
 
-  constructor(private readonly connection: ConnectionManager) {}
+  constructor(private readonly output: SoundSink) {}
 
   get playing(): boolean {
     return this.session !== null;
@@ -30,7 +30,7 @@ export class Previewer {
     this.session = session;
     const step = () => {
       session.tick(performance.now());
-      for (const event of session.drainOutput()) this.connection.send(event);
+      for (const event of session.drainOutput()) this.output.send(event);
       if (session.getState().status === 'finished') {
         this.stop();
         onEnd();
@@ -45,7 +45,7 @@ export class Previewer {
     cancelAnimationFrame(this.frame);
     if (this.session) {
       this.session = null;
-      this.connection.send({ type: 'allNotesOff' });
+      this.output.send({ type: 'allNotesOff' });
     }
   }
 }

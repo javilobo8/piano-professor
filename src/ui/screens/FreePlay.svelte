@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
-  import { connection, nameNote, screen, t } from '../app-state';
+  import { connection, nameNote, output, screen, t } from '../app-state';
   import ConnectionBadge from '../components/ConnectionBadge.svelte';
   import { FreePlayController } from '../free-play-controller';
 
@@ -39,6 +39,7 @@
     const created = new FreePlayController(
       canvas,
       connection,
+      output,
       (p: number) => $nameNote(p, false),
       onHeldChange,
       () => (played = true),

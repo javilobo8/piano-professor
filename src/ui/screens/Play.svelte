@@ -7,7 +7,7 @@
   import type { Song } from '../../song/types';
   import { recordRun } from '../../storage/scores';
   import type { HandChoice } from '../../storage/settings';
-  import { connection, getDb, nameNote, screen, settings, t, type PlayRequest } from '../app-state';
+  import { connection, getDb, nameNote, output, screen, settings, t, type PlayRequest } from '../app-state';
   import ConnectionBadge from '../components/ConnectionBadge.svelte';
   import ResultsOverlay from '../components/ResultsOverlay.svelte';
   import Segmented from '../components/Segmented.svelte';
@@ -121,6 +121,7 @@
         volume: $settings.volume,
       },
       connection,
+      output,
       display(),
       onFrame,
     );

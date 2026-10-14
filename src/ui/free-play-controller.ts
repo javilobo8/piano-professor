@@ -1,9 +1,11 @@
+import type { SoundSink } from '../audio/sound-output';
 import type { ConnectionManager } from '../midi-io/connection-manager';
 import { layoutKeyboard, type KeyboardLayout } from '../render/keyboard-layout';
 import { NoteTrail } from '../render/note-trail';
 import { drawFreePlayFrame } from '../render/renderer';
 import { PIANO_HIGH, PIANO_LOW } from '../song/parse';
 import { KeyboardInput } from './keyboard-input';
+import { LocalNotes } from './local-notes';
 
 const TOUCH_VELOCITY = 0.8;
 
@@ -20,13 +22,14 @@ export class FreePlayController {
   private heldKey = '';
   private input: KeyboardInput | null = null;
   /** On-screen / PC-keyboard sources holding each pitch. */
-  private local = new Map<number, number>();
+  private readonly local = new LocalNotes();
   private firstNoteSeen = false;
   private cleanups: Array<() => void> = [];
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly connection: ConnectionManager,
+    private readonly output: SoundSink,
     private noteLabel: ((pitch: number) => string) | null,
     private readonly onHeldChange: (held: number[]) => void,
     private readonly onFirstNote: () => void,
@@ -76,38 +79,31 @@ export class FreePlayController {
     for (const cleanup of this.cleanups) cleanup();
     this.cleanups = [];
     this.input = null;
-    this.connection.send({ type: 'allNotesOff' });
+    this.output.send({ type: 'allNotesOff' });
   }
 
-  /** Lets go of everything: on-screen input, the trail and the piano's sounding notes. */
+  /** Lets go of everything: on-screen input, the trail and every sounding note. */
   releaseAll(): void {
     this.input?.releaseAll();
     this.trail.releaseAll(performance.now());
-    this.connection.send({ type: 'allNotesOff' });
+    this.output.send({ type: 'allNotesOff' });
   }
 
   setNoteLabel(noteLabel: ((pitch: number) => string) | null): void {
     this.noteLabel = noteLabel;
   }
 
-  /** Touch and PC-keyboard notes: shown on the trail and sounded on the piano (not echoed back). */
+  /** Touch and PC-keyboard notes: shown on the trail and sounded through the output (not echoed back). */
   private touch(type: 'on' | 'off', pitch: number): void {
-    const count = this.local.get(pitch) ?? 0;
     const now = performance.now();
     if (type === 'on') {
-      this.local.set(pitch, count + 1);
-      if (count > 0) return;
+      if (!this.local.press(pitch)) return;
       this.noteOn(pitch, TOUCH_VELOCITY, now);
-      this.connection.send({ type: 'noteOn', pitch, velocity: Math.round(TOUCH_VELOCITY * 127) });
+      this.output.send({ type: 'noteOn', pitch, velocity: Math.round(TOUCH_VELOCITY * 127) });
     } else {
-      if (count === 0) return;
-      if (count > 1) {
-        this.local.set(pitch, count - 1);
-        return;
-      }
-      this.local.delete(pitch);
+      if (!this.local.release(pitch)) return;
       this.trail.noteOff(pitch, now);
-      this.connection.send({ type: 'noteOff', pitch });
+      this.output.send({ type: 'noteOff', pitch });
     }
   }
 

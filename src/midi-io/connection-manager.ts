@@ -48,8 +48,8 @@ async function defaultRequestBle(): Promise<MidiConnection> {
 }
 
 /**
- * Owns the link to the piano: connects over USB automatically (and on hot-plug),
- * over Bluetooth on request, and merges in notes from the on-screen keyboard.
+ * Owns the link to the piano: connects over USB automatically (and on hot-plug)
+ * and over Bluetooth on request, and delivers the piano's keys and pedal.
  */
 export class ConnectionManager {
   private status: ConnectionStatus = { state: 'disconnected', error: null };
@@ -94,11 +94,6 @@ export class ConnectionManager {
     return () => {
       this.pedalListeners.delete(cb);
     };
-  }
-
-  /** Notes from the on-screen or PC keyboard. */
-  emitVirtual(event: NoteEvent): void {
-    this.dispatch(event);
   }
 
   send(event: OutputEvent): void {

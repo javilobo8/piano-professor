@@ -215,13 +215,3 @@ describe('ConnectionManager over Bluetooth', () => {
     expect(failing.current).toEqual({ state: 'disconnected', error: 'bluetooth-failed' });
   });
 });
-
-describe('ConnectionManager virtual keyboard', () => {
-  it('forwards on-screen notes to listeners', () => {
-    const manager = new ConnectionManager({ requestMIDIAccess: () => Promise.reject(new Error()) });
-    const notes: NoteEvent[] = [];
-    manager.onNote((e) => notes.push(e));
-    manager.emitVirtual({ type: 'on', pitch: 60, velocity: 0.8, timeMs: 5 });
-    expect(notes).toEqual([{ type: 'on', pitch: 60, velocity: 0.8, timeMs: 5 }]);
-  });
-});

@@ -1,3 +1,4 @@
+import type { SoundSink } from '../audio/sound-output';
 import { PracticeSession, practicedRoles } from '../engine/session';
 import type { LoopRange, SessionConfig, SessionState } from '../engine/types';
 import type { ConnectionManager } from '../midi-io/connection-manager';
@@ -6,7 +7,10 @@ import type { PlayableNote, PlayRole } from '../song/types';
 import { drawFrame, maxNoteDuration } from '../render/renderer';
 import { layoutKeyboard, songRange, type KeyboardLayout } from '../render/keyboard-layout';
 import { KeyboardInput } from './keyboard-input';
+import { LocalNotes } from './local-notes';
 import { restartPosition } from './restart-position';
+
+const TOUCH_VELOCITY = 0.8;
 
 export interface DisplayOptions {
   showAccompaniment: boolean;
@@ -16,7 +20,7 @@ export interface DisplayOptions {
 
 /**
  * Runs the play screen: owns the practice session, the animation loop,
- * the canvas and every input source (piano, touch, PC keyboard).
+ * the canvas, every input source (piano, touch, PC keyboard) and what it sounds.
  */
 export class PlayController {
   private session: PracticeSession;
@@ -28,6 +32,7 @@ export class PlayController {
   private readonly firstNoteStart: number;
   private practiced: Set<PlayRole>;
   private cleanups: Array<() => void> = [];
+  private readonly local = new LocalNotes();
   private display: DisplayOptions;
 
   constructor(
@@ -36,6 +41,7 @@ export class PlayController {
     private readonly measures: readonly number[],
     private config: SessionConfig,
     private readonly connection: ConnectionManager,
+    private readonly output: SoundSink,
     display: DisplayOptions,
     private readonly onFrame: (state: SessionState) => void,
   ) {
@@ -49,9 +55,9 @@ export class PlayController {
   start(): void {
     this.cleanups.push(
       this.connection.onNote((e) => {
-        if (e.type === 'on') this.session.noteOn(e.pitch, e.velocity, e.timeMs);
-        else this.session.noteOff(e.pitch, e.timeMs);
-        this.flush();
+        // A pitch held on screen is already being played; the same note coming back is an echo.
+        if (this.local.has(e.pitch)) return;
+        this.press(e.type, e.pitch, e.velocity, e.timeMs);
       }),
     );
     const resize = new ResizeObserver(() => this.resize());
@@ -64,7 +70,7 @@ export class PlayController {
     );
     this.cleanups.push(input.attach());
     // Leaving or closing the app must not leave notes hanging on the piano.
-    const onPageHide = () => this.connection.send({ type: 'allNotesOff' });
+    const onPageHide = () => this.output.send({ type: 'allNotesOff' });
     window.addEventListener('pagehide', onPageHide);
     this.cleanups.push(() => window.removeEventListener('pagehide', onPageHide));
     this.resize();
@@ -81,7 +87,7 @@ export class PlayController {
     cancelAnimationFrame(this.frame);
     for (const cleanup of this.cleanups) cleanup();
     this.cleanups = [];
-    this.connection.send({ type: 'allNotesOff' });
+    this.output.send({ type: 'allNotesOff' });
   }
 
   setDisplay(display: DisplayOptions): void {
@@ -128,7 +134,7 @@ export class PlayController {
    */
   restart(changes: Partial<SessionConfig>, keepPosition: boolean): void {
     const position = keepPosition ? restartPosition(this.session.getState(), this.firstNoteStart) : null;
-    this.connection.send({ type: 'allNotesOff' });
+    this.output.send({ type: 'allNotesOff' });
     this.config = { ...this.config, ...changes };
     this.practiced = practicedRoles(this.config.practice);
     const now = performance.now();
@@ -138,7 +144,7 @@ export class PlayController {
   }
 
   private flush(): void {
-    for (const event of this.session.drainOutput()) this.connection.send(event);
+    for (const event of this.session.drainOutput()) this.output.send(event);
   }
 
   private resize(): void {
@@ -185,7 +191,26 @@ export class PlayController {
     });
   }
 
+  private press(type: 'on' | 'off', pitch: number, velocity: number, timeMs: number): void {
+    if (type === 'on') this.session.noteOn(pitch, velocity, timeMs);
+    else this.session.noteOff(pitch, timeMs);
+    this.flush();
+  }
+
+  /**
+   * Touch and PC-keyboard notes: judged like piano keys and sounded through the output.
+   * The note is sent after the session's output, so the all-notes-off that completes a wait step does not cut it.
+   */
   private virtual(type: 'on' | 'off', pitch: number): void {
-    this.connection.emitVirtual({ type, pitch, velocity: 0.8, timeMs: performance.now() });
+    const now = performance.now();
+    if (type === 'on') {
+      if (!this.local.press(pitch)) return;
+      this.press('on', pitch, TOUCH_VELOCITY, now);
+      this.output.send({ type: 'noteOn', pitch, velocity: Math.round(TOUCH_VELOCITY * 127) });
+    } else {
+      if (!this.local.release(pitch)) return;
+      this.press('off', pitch, 0, now);
+      this.output.send({ type: 'noteOff', pitch });
+    }
   }
 }

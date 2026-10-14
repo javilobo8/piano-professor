@@ -1,4 +1,6 @@
 import { derived, writable, type Readable } from 'svelte/store';
+import { SoundOutput } from '../audio/sound-output';
+import { WebPiano, type WebPianoStatus } from '../audio/web-piano';
 import type { Mode } from '../engine/types';
 import { noteName, noteNameStyle, translate, type Translate } from '../i18n';
 import { ConnectionManager } from '../midi-io/connection-manager';
@@ -11,6 +13,16 @@ export const connection = new ConnectionManager();
 export const connectionStatus: Readable<ConnectionStatus> = {
   subscribe: (cb) => connection.subscribe(cb),
 };
+
+/** The sampled piano that plays in the browser. */
+export const webPiano = new WebPiano();
+
+export const webPianoStatus: Readable<WebPianoStatus> = {
+  subscribe: (cb) => webPiano.subscribe(cb),
+};
+
+/** Where every sound of the app goes: the piano, the browser or both. */
+export const output = new SoundOutput(connection, webPiano);
 
 function createSettingsStore() {
   const store = writable<Settings>(loadSettings());

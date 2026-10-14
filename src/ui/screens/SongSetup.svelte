@@ -6,7 +6,7 @@
   import type { HandConfig, Role, Song } from '../../song/types';
   import type { HandChoice } from '../../storage/settings';
   import { saveHandConfig } from '../../storage/songs';
-  import { connection, getDb, nameNote, screen, settings, t } from '../app-state';
+  import { getDb, nameNote, output, screen, settings, t } from '../app-state';
   import ConnectionBadge from '../components/ConnectionBadge.svelte';
   import Segmented from '../components/Segmented.svelte';
   import { HAND_KEYS, MODE_KEYS, ROLE_KEYS } from '../labels';
@@ -29,7 +29,7 @@
   let speedPercent = $state(Math.round($settings.lastSpeed * 100));
   /** 'song', a track index, or null when nothing is playing. */
   let previewing = $state<'song' | number | null>(null);
-  const previewer = new Previewer(connection);
+  const previewer = new Previewer(output);
 
   /** False when the chosen hand gets no notes under the current track roles or split. */
   const handHasNotes = $derived.by(() => {
