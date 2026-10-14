@@ -16,6 +16,10 @@
     held = next;
   }
 
+  function openSettings() {
+    screen.update((current) => ({ name: 'settings', back: current }));
+  }
+
   async function requestWakeLock() {
     try {
       const sentinel = (await navigator.wakeLock?.request('screen')) ?? null;
@@ -70,6 +74,9 @@
     <h1>{$t('freePlay.title')}</h1>
     <span class="held">{held.map((p) => $nameNote(p)).join(' · ')}</span>
     <ConnectionBadge compact />
+    <button class="ghost gear" onclick={openSettings} aria-label={$t('settings.title')} title={$t('settings.title')}
+      >⚙</button
+    >
   </header>
 
   <div class="stage">

@@ -4,6 +4,7 @@
   import { connection, connectionStatus, screen, settings, t, type Screen } from '../app-state';
   import ConnectionBadge from '../components/ConnectionBadge.svelte';
   import Segmented from '../components/Segmented.svelte';
+  import SoundOutputField from '../components/SoundOutputField.svelte';
   import { ERROR_KEYS, NOTE_NAME_KEYS } from '../labels';
 
   let { back }: { back: Screen } = $props();
@@ -108,6 +109,7 @@
 
     <section class="card">
       <h2>{$t('settings.sound')}</h2>
+      <SoundOutputField showHint />
       <label class="check">
         <input type="checkbox" bind:checked={$settings.soundOn} />
         {$t('setup.sound')}

@@ -35,4 +35,13 @@ describe('settings', () => {
     expect(loadSettings(memoryStorage({ 'piano-professor.settings': '{oops' }))).toEqual(DEFAULT_SETTINGS);
     expect(loadSettings(null)).toEqual(DEFAULT_SETTINGS);
   });
+
+  it('sends sound to the piano unless another valid output was saved', () => {
+    expect(DEFAULT_SETTINGS.soundOutput).toBe('piano');
+    const storage = memoryStorage();
+    saveSettings({ ...DEFAULT_SETTINGS, soundOutput: 'both' }, storage);
+    expect(loadSettings(storage).soundOutput).toBe('both');
+    const bad = memoryStorage({ 'piano-professor.settings': JSON.stringify({ soundOutput: 'speakers' }) });
+    expect(loadSettings(bad).soundOutput).toBe('piano');
+  });
 });

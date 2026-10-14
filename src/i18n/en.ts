@@ -43,7 +43,7 @@ export const en = {
   'setup.hand': 'Hand',
   'setup.mode': 'Mode',
   'setup.speed': 'Speed',
-  'setup.sound': 'Play the other parts on the piano',
+  'setup.sound': 'Play the other parts',
   'setup.volume': 'Volume',
   'setup.listen': 'Listen to the song',
   'setup.stop': 'Stop',
@@ -104,6 +104,14 @@ export const en = {
   'settings.connection': 'Piano connection',
   'settings.display': 'Display',
   'settings.sound': 'Sound',
+  'settings.soundOutput': 'Sound output',
+  'settings.soundOutput.piano': 'Piano',
+  'settings.soundOutput.web': 'Browser',
+  'settings.soundOutput.both': 'Both',
+  'settings.soundLoading': 'Loading the browser piano…',
+  'settings.soundError': 'The browser piano could not be loaded.',
+  'settings.soundRetry': 'Retry',
+  'settings.soundWebHint': 'Keys you play on the piano still sound on the piano: turn its volume down to hear only the browser.',
 } as const;
 
 export type MessageKey = keyof typeof en;

@@ -9,6 +9,7 @@
   import { getDb, nameNote, output, screen, settings, t } from '../app-state';
   import ConnectionBadge from '../components/ConnectionBadge.svelte';
   import Segmented from '../components/Segmented.svelte';
+  import SoundOutputField from '../components/SoundOutputField.svelte';
   import { HAND_KEYS, MODE_KEYS, ROLE_KEYS } from '../labels';
   import { Previewer } from '../previewer';
   import { loadSong } from '../song-loader';
@@ -206,6 +207,7 @@
           <span>{$t('setup.speed')}: {speedPercent}%</span>
           <input type="range" min="25" max="150" step="5" bind:value={speedPercent} />
         </label>
+        <SoundOutputField />
         <label class="check">
           <input type="checkbox" bind:checked={$settings.soundOn} />
           {$t('setup.sound')}

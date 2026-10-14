@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { connection, screen, settings } from './app-state';
+  import { connection, screen, settings, webPiano } from './app-state';
   import FreePlay from './screens/FreePlay.svelte';
   import Library from './screens/Library.svelte';
   import Play from './screens/Play.svelte';
@@ -9,6 +9,19 @@
 
   onMount(() => {
     void connection.startUsb($settings.preferredDevice);
+    // Browsers keep audio suspended until a user gesture: wake the browser piano on every tap or key.
+    const wake = () => webPiano.resume();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') webPiano.resume();
+    };
+    window.addEventListener('pointerdown', wake, true);
+    window.addEventListener('keydown', wake, true);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('pointerdown', wake, true);
+      window.removeEventListener('keydown', wake, true);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   });
 
   $effect(() => {

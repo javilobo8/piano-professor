@@ -1,3 +1,4 @@
+import type { SoundTarget } from '../audio/sound-output';
 import type { Mode } from '../engine/types';
 import type { Language, NoteNameSetting } from '../i18n';
 
@@ -12,6 +13,8 @@ export interface Settings {
   soundOn: boolean;
   /** 0–1 */
   volume: number;
+  /** Where the app sounds: the piano (MIDI), the browser or both. */
+  soundOutput: SoundTarget;
   /** Name of the last USB MIDI input chosen by hand. */
   preferredDevice: string | null;
   lastMode: Mode;
@@ -28,6 +31,7 @@ export const DEFAULT_SETTINGS: Settings = {
   keyboardRange: 'song',
   soundOn: true,
   volume: 0.8,
+  soundOutput: 'piano',
   preferredDevice: null,
   lastMode: 'wait',
   lastHand: 'right',
@@ -60,6 +64,7 @@ const validators: { [K in keyof Settings]: (v: unknown) => v is Settings[K] } = 
   keyboardRange: oneOf<'song' | 'full'>('song', 'full'),
   soundOn: isBool,
   volume: inRange(0, 1),
+  soundOutput: oneOf<SoundTarget>('piano', 'web', 'both'),
   preferredDevice: (v: unknown): v is string | null => v === null || typeof v === 'string',
   lastMode: oneOf<Mode>('wait', 'tempo'),
   lastHand: oneOf<HandChoice>('right', 'left', 'both'),

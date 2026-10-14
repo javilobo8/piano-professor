@@ -31,6 +31,7 @@ function createSettingsStore() {
 }
 
 export const settings = createSettingsStore();
+settings.subscribe((s) => output.setTarget(s.soundOutput));
 
 export const t: Readable<Translate> = derived(
   settings,

@@ -1,3 +1,4 @@
+import type { SoundTarget } from '../audio/sound-output';
 import type { Mode } from '../engine/types';
 import type { MessageKey, NoteNameSetting } from '../i18n';
 import type { ConnectionError } from '../midi-io/types';
@@ -36,4 +37,10 @@ export const NOTE_NAME_KEYS: Record<NoteNameSetting, MessageKey> = {
   auto: 'settings.noteNames.auto',
   letters: 'settings.noteNames.letters',
   solfege: 'settings.noteNames.solfege',
+};
+
+export const SOUND_OUTPUT_KEYS: Record<SoundTarget, MessageKey> = {
+  piano: 'settings.soundOutput.piano',
+  web: 'settings.soundOutput.web',
+  both: 'settings.soundOutput.both',
 };
