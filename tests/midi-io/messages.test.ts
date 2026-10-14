@@ -55,4 +55,12 @@ describe('pickPreferredPort', () => {
     expect(pickPreferredPort([{ name: 'a' }, { name: 'b' }], null)).toEqual({ name: 'a' });
     expect(pickPreferredPort([], null)).toBeNull();
   });
+
+  it('skips the Midi Through loopback unless it was chosen by hand', () => {
+    expect(pickPreferredPort([{ name: 'Midi Through Port-0' }], null)).toBeNull();
+    expect(pickPreferredPort([{ name: 'Midi Through Port-0' }, { name: 'a' }], null)).toEqual({ name: 'a' });
+    expect(pickPreferredPort([{ name: 'Midi Through Port-0' }], 'Midi Through Port-0')).toEqual({
+      name: 'Midi Through Port-0',
+    });
+  });
 });

@@ -39,12 +39,15 @@ export class MidiOutputEncoder {
   }
 }
 
-/** Picks the port to use: the remembered one, else a Roland FP-10, else the first. */
+/**
+ * Picks the port to use: the remembered one, else a Roland FP-10, else the first
+ * that is not the Linux "Midi Through" loopback (it echoes everything we send).
+ */
 export function pickPreferredPort<T extends { name: string }>(ports: readonly T[], preferredName: string | null): T | null {
   return (
     (preferredName ? ports.find((p) => p.name === preferredName) : undefined) ??
     ports.find((p) => /fp-?10|roland/i.test(p.name)) ??
-    ports[0] ??
+    ports.find((p) => !/midi through/i.test(p.name)) ??
     null
   );
 }
