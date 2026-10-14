@@ -30,7 +30,7 @@
 <header class="app-header">
   {#if onback}
     <button class="icon ghost" onclick={onback} aria-label={$t('common.back')} title={$t('common.back')}>
-      <ArrowLeft size={22} aria-hidden="true" />
+      <ArrowLeft size={20} aria-hidden="true" />
     </button>
   {/if}
 
@@ -39,7 +39,7 @@
   {:else}
     <div class="brand">
       <span class="mark"><Piano size={18} aria-hidden="true" /></span>
-      <span class="name">{$t('app.title')}</span>
+      <h1 class="name">{$t('app.title')}</h1>
     </div>
   {/if}
 
@@ -94,6 +94,7 @@
   }
   .name {
     min-width: 0;
+    margin: 0;
     font-size: 18px;
     font-weight: 800;
     letter-spacing: -0.01em;
