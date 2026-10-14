@@ -170,6 +170,10 @@ Capa fina de Web Audio sobre `VoiceBook`.
 - `pagehide` → los controladores ya mandan `allNotesOff`, que ahora llega a los dos destinos.
 - Más de 48 voces → se corta la más antigua.
 - Una voz sostenida cuyo pedal nunca se levanta termina sola al acabarse la muestra (8 s).
+- Teclado táctil en Tocar: el `allNotesOff` que manda la canción (paso completado en modo
+  espera, saltos, bucle) también corta una nota táctil que siga pulsada, en el piano y en el
+  navegador. La nota que completa un paso se envía después de ese `allNotesOff`, así que
+  siempre suena. Aceptado: las teclas del FP-10 no se ven afectadas.
 
 ## 5. Pruebas
 
