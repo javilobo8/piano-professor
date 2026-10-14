@@ -10,6 +10,8 @@ export interface KeyRect {
 export interface KeyboardLayout {
   low: number;
   high: number;
+  /** Total width of the keyboard (CSS px). */
+  width: number;
   whiteWidth: number;
   blackWidth: number;
   /** White keys first, then black keys (draw order). */
@@ -69,7 +71,7 @@ export function layoutKeyboard(low: number, high: number, width: number): Keyboa
     }
   }
   const keys = [...whites, ...blacks];
-  return { low, high, whiteWidth, blackWidth, keys, byPitch: new Map(keys.map((k) => [k.pitch, k])) };
+  return { low, high, width, whiteWidth, blackWidth, keys, byPitch: new Map(keys.map((k) => [k.pitch, k])) };
 }
 
 /** Key under an x position on the keyboard; black keys win in their upper part. */

@@ -22,6 +22,7 @@ describe('keyboard layout', () => {
     const layout = layoutKeyboard(21, 108, 520);
     expect(layout.keys).toHaveLength(88);
     expect(layout.whiteWidth).toBe(10);
+    expect(layout.width).toBe(520);
     // C4 is the 24th white key from A0 (A0, B0 + 3 octaves of 7).
     expect(layout.byPitch.get(60)).toEqual({ pitch: 60, x: 230, width: 10, black: false });
     // C#4 straddles the C4/D4 boundary.
