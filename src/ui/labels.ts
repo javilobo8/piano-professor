@@ -1,5 +1,5 @@
 import type { SoundTarget } from '../audio/sound-output';
-import type { Mode } from '../engine/types';
+import type { Mode, Practice } from '../engine/types';
 import type { MessageKey, NoteNameSetting } from '../i18n';
 import type { ConnectionError } from '../midi-io/types';
 import type { HandChoice } from '../storage/settings';
@@ -11,10 +11,11 @@ export const HAND_KEYS: Record<HandChoice, MessageKey> = {
   both: 'hand.both',
 };
 
-export const HAND_SHORT_KEYS: Record<HandChoice, MessageKey> = {
+export const HAND_SHORT_KEYS: Record<Practice, MessageKey> = {
   right: 'hand.short.right',
   left: 'hand.short.left',
   both: 'hand.short.both',
+  none: 'hand.short.none',
 };
 
 export const MODE_KEYS: Record<Mode, MessageKey> = { wait: 'mode.wait', tempo: 'mode.tempo' };

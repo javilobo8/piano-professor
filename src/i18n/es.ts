@@ -49,7 +49,6 @@ export const es: Record<MessageKey, string> = {
   'setup.sound': 'Tocar las otras partes',
   'setup.volume': 'Volumen',
   'setup.listen': 'Escuchar la canción',
-  'setup.stop': 'Parar',
   'setup.start': 'Empezar',
   'setup.noNotesForHand': 'Esta mano no tiene notas en esta canción.',
 
@@ -64,6 +63,7 @@ export const es: Record<MessageKey, string> = {
   'hand.short.right': 'D',
   'hand.short.left': 'I',
   'hand.short.both': 'D+I',
+  'hand.short.none': 'Escuchar',
 
   'mode.wait': 'Espera',
   'mode.tempo': 'Con tempo',
@@ -76,6 +76,10 @@ export const es: Record<MessageKey, string> = {
   'play.loopFrom': 'A',
   'play.loopTo': 'B',
   'play.loopPass': 'Vuelta {n}: {percent}%',
+
+  'listen.ended': 'Fin de la canción',
+  'listen.again': 'Escuchar otra vez',
+  'listen.practice': 'Practicarla',
 
   'results.title': 'Resultados',
   'results.cleanSteps': 'Pasos sin errores',

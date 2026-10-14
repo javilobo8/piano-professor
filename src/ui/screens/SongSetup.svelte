@@ -28,15 +28,17 @@
   let hand = $state<HandChoice>($settings.lastHand);
   let mode = $state<Mode>($settings.lastMode);
   let speedPercent = $state(Math.round($settings.lastSpeed * 100));
-  /** 'song', a track index, or null when nothing is playing. */
-  let previewing = $state<'song' | number | null>(null);
+  /** Index of the track being previewed, or null when nothing is playing. */
+  let previewing = $state<number | null>(null);
   const previewer = new Previewer(output);
 
+  /** Notes of the song under the current track roles or split (ignored tracks left out). */
+  const playable = $derived(song && handConfig ? applyHandConfig(song, handConfig) : []);
   /** False when the chosen hand gets no notes under the current track roles or split. */
   const handHasNotes = $derived.by(() => {
     if (!song || !handConfig) return true;
     const roles = practicedRoles(hand);
-    return applyHandConfig(song, handConfig).some((n) => roles.has(n.role));
+    return playable.some((n) => roles.has(n.role));
   });
 
   onMount(async () => {
@@ -69,19 +71,15 @@
     void updateConfig({ ...handConfig, method: enabled ? 'split' : 'tracks', trackRoles: tracks });
   }
 
-  function togglePreview(target: 'song' | number) {
-    if (!song || !handConfig) return;
-    if (previewing === target) {
+  function togglePreview(track: number) {
+    if (!song) return;
+    if (previewing === track) {
       previewer.stop();
       previewing = null;
       return;
     }
-    const all = applyHandConfig(song, $state.snapshot(handConfig) as HandConfig);
-    const notes =
-      target === 'song'
-        ? all
-        : song.notes.filter((n) => n.track === target).map((n) => ({ ...n, role: 'right' as const }));
-    previewing = target;
+    const notes = song.notes.filter((n) => n.track === track).map((n) => ({ ...n, role: 'right' as const }));
+    previewing = track;
     previewer.play(notes, song.measures, $settings.volume, () => (previewing = null));
   }
 
@@ -106,6 +104,15 @@
     const speed = speedPercent / 100;
     settings.update((s) => ({ ...s, lastHand: hand, lastMode: mode, lastSpeed: speed }));
     screen.set({ name: 'play', request: { songId, hand, mode, speed } });
+  }
+
+  /** Watches the whole song play on the falling-notes screen; the hand choice is kept for practice. */
+  function listen() {
+    if (playable.length === 0) return;
+    previewer.stop();
+    const speed = speedPercent / 100;
+    settings.update((s) => ({ ...s, lastHand: hand, lastMode: mode, lastSpeed: speed }));
+    screen.set({ name: 'play', request: { songId, hand: 'none', mode, speed } });
   }
 </script>
 
@@ -220,9 +227,7 @@
           <p class="error">{$t('setup.noNotesForHand')}</p>
         {/if}
         <div class="buttons">
-          <button onclick={() => togglePreview('song')}>
-            {previewing === 'song' ? $t('setup.stop') : $t('setup.listen')}
-          </button>
+          <button onclick={listen} disabled={playable.length === 0}>{$t('setup.listen')}</button>
           <button class="primary" onclick={start} disabled={!handHasNotes}>{$t('setup.start')} ▶</button>
         </div>
       </section>

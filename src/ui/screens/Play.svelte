@@ -2,13 +2,13 @@
   import { onDestroy, onMount } from 'svelte';
   import { scorePercent } from '../../engine/scoring';
   import { clampSpeed } from '../../engine/session';
-  import type { LoopRange, Score, SessionState, Status } from '../../engine/types';
+  import type { LoopRange, Practice, Score, SessionState, Status } from '../../engine/types';
   import { applyHandConfig } from '../../song/hands';
   import type { Song } from '../../song/types';
   import { recordRun } from '../../storage/scores';
-  import type { HandChoice } from '../../storage/settings';
   import { connection, getDb, nameNote, output, screen, settings, t, type PlayRequest } from '../app-state';
   import ConnectionBadge from '../components/ConnectionBadge.svelte';
+  import ListenEndOverlay from '../components/ListenEndOverlay.svelte';
   import ResultsOverlay from '../components/ResultsOverlay.svelte';
   import Segmented from '../components/Segmented.svelte';
   import { formatDuration, measureAt } from '../format';
@@ -18,7 +18,7 @@
 
   let { request }: { request: PlayRequest } = $props();
 
-  const HANDS: HandChoice[] = ['right', 'left', 'both'];
+  const HANDS: Practice[] = ['right', 'left', 'both', 'none'];
 
   let canvas = $state<HTMLCanvasElement>();
   let song = $state<Song | null>(null);
@@ -28,7 +28,7 @@
   /** Incremented whenever a run is restarted or sought, so stale finish() results are ignored. */
   let runId = 0;
   // svelte-ignore state_referenced_locally
-  let hand = $state<HandChoice>(request.hand);
+  let hand = $state<Practice>(request.hand);
   let songTime = $state(0);
   let status = $state<Status>('playing');
   // svelte-ignore state_referenced_locally
@@ -39,6 +39,8 @@
   let results = $state<{ score: Score; saved: boolean; isNewBest: boolean; bestPercent: number | null } | null>(
     null,
   );
+  /** True once a listen-only run has played to the end. */
+  let listenEnded = $state(false);
   let wakeLock: WakeLockSentinel | null = null;
 
   const measureCount = $derived(song ? song.measures.length - 1 : 0);
@@ -58,11 +60,14 @@
     lastLoopScore = state.lastLoopScore;
     if (state.status !== status) {
       status = state.status;
-      if (status === 'finished' && state.score) void finish(state.score, state.complete);
+      if (status === 'finished' && hand === 'none') listenEnded = true;
+      else if (status === 'finished' && state.score) void finish(state.score, state.complete);
     }
   }
 
   async function finish(score: Score, complete: boolean) {
+    const practiced = hand;
+    if (practiced === 'none') return;
     const snapshot = { ...score };
     const myRun = runId;
     const percent = scorePercent(snapshot);
@@ -71,7 +76,7 @@
       results = { score: snapshot, saved: false, isNewBest: false, bestPercent: null };
       return;
     }
-    const { record, isNewBest } = await recordRun(await getDb(), request.songId, hand, request.mode, {
+    const { record, isNewBest } = await recordRun(await getDb(), request.songId, practiced, request.mode, {
       date: Date.now(),
       speed,
       percent,
@@ -156,6 +161,7 @@
   /** A new run starts: drop stale results and let the next 'finished' show the overlay again. */
   function newRun() {
     results = null;
+    listenEnded = false;
     runId++;
     status = 'playing';
   }
@@ -163,7 +169,8 @@
   /** Keeps the Play request (for returning from Settings) and the defaults in step with the screen. */
   function rememberChoices() {
     screen.update((s) => (s.name === 'play' ? { ...s, request: { ...s.request, hand, speed } } : s));
-    settings.update((s) => ({ ...s, lastHand: hand, lastSpeed: speed }));
+    // Listening is not a hand: the next practice keeps the last hand played.
+    settings.update((s) => ({ ...s, lastHand: hand === 'none' ? s.lastHand : hand, lastSpeed: speed }));
   }
 
   function changeSpeed(delta: number) {
@@ -172,7 +179,7 @@
     rememberChoices();
   }
 
-  function changeHand(next: HandChoice) {
+  function changeHand(next: Practice) {
     hand = next;
     newRun();
     // The controller keeps the position only while the run is under way; otherwise it starts over.
@@ -287,6 +294,9 @@
         onretry={retry}
         onback={() => screen.set({ name: 'library' })}
       />
+    {/if}
+    {#if listenEnded}
+      <ListenEndOverlay onlisten={retry} onpractice={() => changeHand($settings.lastHand)} />
     {/if}
   </div>
 </div>

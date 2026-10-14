@@ -101,11 +101,74 @@ describe('drawFrame', () => {
       measures: [0, 2],
       loop: null,
       noteLabel: () => 'C4',
+      showPlayedKeys: false,
     });
     const fills = calls.filter((c) => c.startsWith('fill:'));
     expect(fills).toEqual(['fill:#4cc36a', 'fill:#3d8bfd']);
     expect(calls).toContain('fillText:rgba(255, 255, 255, 0.85)');
     expect(calls).toContain('fillRect:#ef4444');
+  });
+
+  const listening = {
+    width: 800,
+    height: 600,
+    layout: layoutKeyboard(48, 72, 800),
+    maxDuration: 1,
+    practiced: new Set<never>(),
+    expected: new Set<number>(),
+    measures: [0, 2],
+    loop: null,
+    noteLabel: null,
+  };
+
+  it('lights the keys of the notes sounding now when asked, in their hand colour', () => {
+    const { ctx, calls } = recordingContext();
+    const notes = [pn(48, 1, 1, 'left'), pn(55, 1, 1, 'accompaniment'), pn(60, 1, 1, 'right')];
+    drawFrame(ctx, {
+      ...listening,
+      notes,
+      songTime: 1.5,
+      showAccompaniment: true,
+      pressed: new Map(),
+      showPlayedKeys: true,
+    });
+    expect(calls).toContain('fillRect:#4cc36a');
+    expect(calls).toContain('fillRect:#3d8bfd');
+    expect(calls).toContain('fillRect:#6b7280');
+  });
+
+  it('does not light keys of notes not sounding yet, hidden accompaniment, or when not asked', () => {
+    const lit = (input: Partial<Parameters<typeof drawFrame>[1]>) => {
+      const { ctx, calls } = recordingContext();
+      drawFrame(ctx, {
+        ...listening,
+        notes: [pn(55, 0, 2, 'accompaniment'), pn(60, 1, 1, 'right')],
+        maxDuration: 2,
+        songTime: 0.5,
+        showAccompaniment: false,
+        pressed: new Map(),
+        showPlayedKeys: true,
+        ...input,
+      });
+      return calls.filter((c) => c === 'fillRect:#4cc36a' || c === 'fillRect:#6b7280');
+    };
+    expect(lit({})).toEqual([]);
+    expect(lit({ songTime: 1.5, showPlayedKeys: false })).toEqual([]);
+    expect(lit({ songTime: 1.5 })).toEqual(['fillRect:#4cc36a']);
+  });
+
+  it('shows a key the player holds over the song note on it', () => {
+    const { ctx, calls } = recordingContext();
+    drawFrame(ctx, {
+      ...listening,
+      notes: [pn(60, 1, 1, 'right')],
+      songTime: 1.5,
+      showAccompaniment: true,
+      pressed: new Map([[60, 'neutral']]),
+      showPlayedKeys: true,
+    });
+    expect(calls).toContain('fillRect:#a78bfa');
+    expect(calls).not.toContain('fillRect:#4cc36a');
   });
 });
 

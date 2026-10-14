@@ -1,12 +1,12 @@
 import { derived, writable, type Readable } from 'svelte/store';
 import { SoundOutput } from '../audio/sound-output';
 import { WebPiano, type WebPianoStatus } from '../audio/web-piano';
-import type { Mode } from '../engine/types';
+import type { Mode, Practice } from '../engine/types';
 import { noteName, noteNameStyle, translate, type Translate } from '../i18n';
 import { ConnectionManager } from '../midi-io/connection-manager';
 import type { ConnectionStatus } from '../midi-io/types';
 import { openAppDb, type AppDb } from '../storage/db';
-import { loadSettings, saveSettings, type HandChoice, type Settings } from '../storage/settings';
+import { loadSettings, saveSettings, type Settings } from '../storage/settings';
 
 export const connection = new ConnectionManager();
 
@@ -54,7 +54,8 @@ export function getDb(): Promise<AppDb> {
 
 export interface PlayRequest {
   songId: string;
-  hand: HandChoice;
+  /** 'none' = just listen and watch the song. */
+  hand: Practice;
   mode: Mode;
   speed: number;
 }

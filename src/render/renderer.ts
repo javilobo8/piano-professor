@@ -26,6 +26,8 @@ export interface FrameInput {
   loop: { start: number; end: number } | null;
   /** Returns the label drawn inside falling notes, or null for no labels. */
   noteLabel: ((pitch: number) => string) | null;
+  /** Light the keys of the notes sounding now (when just listening, nobody presses them). */
+  showPlayedKeys: boolean;
 }
 
 export interface Geometry {
@@ -53,6 +55,11 @@ function noteColor(note: PlayableNote, black: boolean): string {
   if (note.role === 'accompaniment') return COLORS.accompaniment;
   if (note.role === 'left') return black ? COLORS.leftDark : COLORS.left;
   return black ? COLORS.rightDark : COLORS.right;
+}
+
+function playedKeyColor(role: PlayRole): string {
+  if (role === 'accompaniment') return COLORS.accompaniment;
+  return role === 'left' ? COLORS.left : COLORS.right;
 }
 
 function keyColor(result: KeyResult): string {
@@ -91,6 +98,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, input: FrameInput): voi
   }
 
   const [from, to] = visibleRange(input.notes, songTime, input.maxDuration);
+  const played = new Map<number, PlayRole>();
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
   ctx.font = labelFont(layout);
@@ -100,6 +108,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, input: FrameInput): voi
     if (n.role === 'accompaniment' && !input.showAccompaniment) continue;
     const key = layout.byPitch.get(n.pitch);
     if (!key) continue;
+    if (input.showPlayedKeys && n.start <= songTime && songTime < n.end) played.set(n.pitch, n.role);
     const top = yOf(n.end);
     const bottom = yOf(n.start);
     const h = Math.max(4, bottom - top);
@@ -117,7 +126,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, input: FrameInput): voi
   ctx.globalAlpha = 1;
 
   drawHitLine(ctx, width, g);
-  drawKeyboard(ctx, layout, input.pressed, input.expected, g);
+  drawKeyboard(ctx, layout, input.pressed, input.expected, g, played);
 }
 
 function labelFont(layout: KeyboardLayout): string {
@@ -150,12 +159,16 @@ function drawKeyboard(
   pressed: ReadonlyMap<number, KeyResult>,
   expected: ReadonlySet<number>,
   g: Geometry,
+  played: ReadonlyMap<number, PlayRole>,
 ): void {
   const blackHeight = g.keyboardHeight * 0.62;
   for (const k of layout.keys) {
     const h = k.black ? blackHeight : g.keyboardHeight;
     const result = pressed.get(k.pitch);
-    ctx.fillStyle = result ? keyColor(result) : k.black ? COLORS.blackKey : COLORS.whiteKey;
+    const role = played.get(k.pitch);
+    if (result) ctx.fillStyle = keyColor(result);
+    else if (role) ctx.fillStyle = playedKeyColor(role);
+    else ctx.fillStyle = k.black ? COLORS.blackKey : COLORS.whiteKey;
     ctx.fillRect(k.x, g.keyboardTop, k.width, h);
     if (!k.black) {
       ctx.fillStyle = COLORS.whiteKeyEdge;
@@ -188,6 +201,7 @@ export interface FreePlayFrameInput {
 }
 
 const NO_KEYS: ReadonlySet<number> = new Set();
+const NO_PLAYED: ReadonlyMap<number, PlayRole> = new Map();
 
 /** Hand colour by side of middle C: below 60 → 'left', 60 and up → 'right'. */
 export function freePlaySide(pitch: number): 'left' | 'right' {
@@ -225,5 +239,5 @@ export function drawFreePlayFrame(ctx: CanvasRenderingContext2D, input: FreePlay
   ctx.globalAlpha = 1;
 
   drawHitLine(ctx, width, g);
-  drawKeyboard(ctx, layout, pressed, NO_KEYS, g);
+  drawKeyboard(ctx, layout, pressed, NO_KEYS, g, NO_PLAYED);
 }

@@ -46,7 +46,6 @@ export const en = {
   'setup.sound': 'Play the other parts',
   'setup.volume': 'Volume',
   'setup.listen': 'Listen to the song',
-  'setup.stop': 'Stop',
   'setup.start': 'Start',
   'setup.noNotesForHand': 'This hand has no notes in this song.',
 
@@ -61,6 +60,7 @@ export const en = {
   'hand.short.right': 'R',
   'hand.short.left': 'L',
   'hand.short.both': 'R+L',
+  'hand.short.none': 'Listen',
 
   'mode.wait': 'Wait',
   'mode.tempo': 'Tempo',
@@ -73,6 +73,10 @@ export const en = {
   'play.loopFrom': 'A',
   'play.loopTo': 'B',
   'play.loopPass': 'Pass {n}: {percent}%',
+
+  'listen.ended': 'End of the song',
+  'listen.again': 'Listen again',
+  'listen.practice': 'Practise it',
 
   'results.title': 'Results',
   'results.cleanSteps': 'Clean steps',

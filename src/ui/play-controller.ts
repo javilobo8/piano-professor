@@ -49,7 +49,7 @@ export class PlayController {
     this.maxDuration = maxNoteDuration(notes);
     this.firstNoteStart = notes.reduce((min, n) => Math.min(min, n.start), Infinity);
     this.practiced = practicedRoles(config.practice);
-    this.session = new PracticeSession(notes, measures, config, performance.now());
+    this.session = new PracticeSession(notes, measures, this.sessionConfig(), performance.now());
   }
 
   start(): void {
@@ -122,8 +122,8 @@ export class PlayController {
   }
 
   setSound(soundOn: boolean, volume: number): void {
-    this.session.setSound(soundOn, volume);
     this.config = { ...this.config, soundOn, volume };
+    this.session.setSound(this.sessionConfig().soundOn, volume);
     this.flush();
   }
 
@@ -138,9 +138,18 @@ export class PlayController {
     this.config = { ...this.config, ...changes };
     this.practiced = practicedRoles(this.config.practice);
     const now = performance.now();
-    this.session = new PracticeSession(this.notes, this.measures, this.config, now);
+    this.session = new PracticeSession(this.notes, this.measures, this.sessionConfig(), now);
     if (position !== null && !this.config.loop) this.session.seek(position, now);
     this.flush();
+  }
+
+  private get listening(): boolean {
+    return this.config.practice === 'none';
+  }
+
+  /** When just listening the whole song sounds, even with "play the other parts" off. */
+  private sessionConfig(): SessionConfig {
+    return this.listening ? { ...this.config, soundOn: true } : this.config;
   }
 
   private flush(): void {
@@ -188,6 +197,7 @@ export class PlayController {
           }
         : null,
       noteLabel: this.display.noteLabel,
+      showPlayedKeys: this.listening,
     });
   }
 
