@@ -25,6 +25,9 @@ export const en = {
   'error.emptySong': '"{name}" has no notes to play.',
   'error.songMissing': 'This song could not be loaded.',
 
+  'freePlay.open': 'Free play',
+  'freePlay.title': 'Free play',
+  'freePlay.hint': 'Play anything: your notes rise from the keys.',
   'library.title': 'Library',
   'library.add': 'Add song',
   'library.empty': 'No songs yet. Add a .mid file to start.',

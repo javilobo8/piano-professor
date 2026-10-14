@@ -28,6 +28,9 @@ export const es: Record<MessageKey, string> = {
   'error.emptySong': '"{name}" no tiene notas para tocar.',
   'error.songMissing': 'No se pudo cargar esta canción.',
 
+  'freePlay.open': 'Tocar libre',
+  'freePlay.title': 'Tocar libre',
+  'freePlay.hint': 'Toca lo que quieras: tus notas suben desde las teclas.',
   'library.title': 'Biblioteca',
   'library.add': 'Añadir canción',
   'library.empty': 'Aún no hay canciones. Añade un archivo .mid para empezar.',

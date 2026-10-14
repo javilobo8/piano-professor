@@ -50,6 +50,7 @@ export type Screen =
   | { name: 'library' }
   | { name: 'setup'; songId: string }
   | { name: 'play'; request: PlayRequest }
+  | { name: 'freePlay' }
   | { name: 'settings'; back: Screen };
 
 export const screen = writable<Screen>({ name: 'library' });

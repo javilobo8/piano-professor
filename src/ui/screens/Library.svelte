@@ -97,6 +97,7 @@
 
   <div class="actions">
     <button class="primary" onclick={() => fileInput?.click()}>＋ {$t('library.add')}</button>
+    <button onclick={() => screen.set({ name: 'freePlay' })}>🎹 {$t('freePlay.open')}</button>
     <input
       bind:this={fileInput}
       type="file"
@@ -170,6 +171,9 @@
 
 <style>
   .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
     margin-bottom: 16px;
   }
   .empty {

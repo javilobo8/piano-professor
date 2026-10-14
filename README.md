@@ -8,6 +8,7 @@ Bluetooth MIDI. Built for a Roland FP-10 and an Android tablet running Chrome.
 - **Tempo mode**: the song keeps its tempo and scores your timing.
 - Practise the right hand, the left hand or both; the piano plays the rest.
 - Speed 25–150 %, A–B loop by bars, best scores per song.
+- **Free play**: no song, just the keyboard: every note you play rises from its key as a bar with its name.
 - English and Spanish. Installable PWA that works offline.
 
 ## Using it on the tablet

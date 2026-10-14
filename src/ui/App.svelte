@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { connection, screen, settings } from './app-state';
+  import FreePlay from './screens/FreePlay.svelte';
   import Library from './screens/Library.svelte';
   import Play from './screens/Play.svelte';
   import Settings from './screens/Settings.svelte';
@@ -23,6 +24,8 @@
   {/key}
 {:else if $screen.name === 'play'}
   <Play request={$screen.request} />
+{:else if $screen.name === 'freePlay'}
+  <FreePlay />
 {:else if $screen.name === 'settings'}
   <Settings back={$screen.back} />
 {/if}
