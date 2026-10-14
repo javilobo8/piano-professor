@@ -1,8 +1,11 @@
 <script lang="ts">
   import { connectionStatus, screen, t } from '../app-state';
 
-  /** `compact` shows only the status dot in a round 44 px button. */
-  let { compact = false }: { compact?: boolean } = $props();
+  /**
+   * `compact` shows only the status dot in a round 44 px button.
+   * `interactive={false}` renders a plain status pill that doesn't open Settings (used inside Settings).
+   */
+  let { compact = false, interactive = true }: { compact?: boolean; interactive?: boolean } = $props();
 
   const label = $derived(
     $connectionStatus.state === 'connected'
@@ -17,10 +20,17 @@
   }
 </script>
 
-<button class="badge" class:compact onclick={openSettings} title={label} aria-label={label}>
-  <span class="dot {$connectionStatus.state}" aria-hidden="true"></span>
-  {#if !compact}<span class="text">{label}</span>{/if}
-</button>
+{#if interactive}
+  <button class="badge" class:compact onclick={openSettings} title={label} aria-label={label}>
+    <span class="dot {$connectionStatus.state}" aria-hidden="true"></span>
+    {#if !compact}<span class="text">{label}</span>{/if}
+  </button>
+{:else}
+  <span class="badge static" class:compact role="status" title={label}>
+    <span class="dot {$connectionStatus.state}" aria-hidden="true"></span>
+    {#if compact}<span class="visually-hidden">{label}</span>{:else}<span class="text">{label}</span>{/if}
+  </span>
+{/if}
 
 <style>
   .badge {
@@ -37,8 +47,10 @@
     background: var(--glass);
     -webkit-backdrop-filter: blur(14px);
     backdrop-filter: blur(14px);
+    color: var(--text);
     font-size: 13px;
     font-weight: 600;
+    line-height: 1.2;
   }
   .badge.compact {
     justify-content: center;
@@ -53,6 +65,14 @@
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
+  }
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
   .dot {
     flex: none;
@@ -75,7 +95,7 @@
     }
   }
   @media (hover: hover) {
-    .badge:hover {
+    button.badge:hover {
       background: var(--glass);
       border-color: var(--border-strong);
     }

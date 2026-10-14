@@ -51,7 +51,7 @@
         <h2 id="connection-title">{$t('settings.connection')}</h2>
       </div>
 
-      <div class="status"><ConnectionBadge /></div>
+      <div class="status"><ConnectionBadge interactive={false} /></div>
       {#if $connectionStatus.state === 'disconnected' && $connectionStatus.error}
         <p class="notice" role="alert">
           <CircleAlert size={20} aria-hidden="true" />{$t(ERROR_KEYS[$connectionStatus.error])}
