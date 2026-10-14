@@ -41,7 +41,9 @@ export class NoteTrail {
   /** Notes still on screen at nowMs (drops released notes that have risen off the top). */
   visible(nowMs: number): readonly TrailNote[] {
     const limit = nowMs - VISIBLE_SECONDS * 1000;
-    this.notes = this.notes.filter((n) => n.endMs === null || n.endMs > limit);
+    let kept = 0;
+    for (const n of this.notes) if (n.endMs === null || n.endMs > limit) this.notes[kept++] = n;
+    this.notes.length = kept;
     return this.notes;
   }
 }

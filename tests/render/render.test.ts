@@ -23,19 +23,9 @@ describe('keyboard layout', () => {
     expect(layout.keys).toHaveLength(88);
     expect(layout.whiteWidth).toBe(10);
     // C4 is the 24th white key from A0 (A0, B0 + 3 octaves of 7).
-    expect(layout.byPitch.get(60)).toEqual({
-      pitch: 60,
-      x: 230,
-      width: 10,
-      black: false,
-    });
+    expect(layout.byPitch.get(60)).toEqual({ pitch: 60, x: 230, width: 10, black: false });
     // C#4 straddles the C4/D4 boundary.
-    expect(layout.byPitch.get(61)).toEqual({
-      pitch: 61,
-      x: 237,
-      width: 6,
-      black: true,
-    });
+    expect(layout.byPitch.get(61)).toEqual({ pitch: 61, x: 237, width: 6, black: true });
   });
 
   it('lists white keys before black keys', () => {
@@ -120,7 +110,7 @@ describe('drawFrame', () => {
 });
 
 describe('free play', () => {
-  const g = geometry(800, 600, 10); // keyboardTop 444, 148 px/s
+  const g = geometry(800, 600, 10); // keyboardTop 516, 172 px/s
   const held: TrailNote = {
     pitch: 60,
     velocity: 0.5,

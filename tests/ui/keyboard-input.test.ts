@@ -13,7 +13,7 @@ function setup() {
     target.dispatchEvent(
       Object.assign(new Event(type), { code, repeat, ctrlKey: false, metaKey: false, altKey: false }),
     );
-  return { target, events, key, detach };
+  return { target, events, key, detach, input };
 }
 
 describe('KeyboardInput (PC keys)', () => {
@@ -39,6 +39,17 @@ describe('KeyboardInput (PC keys)', () => {
     target.dispatchEvent(new Event('blur'));
     expect(events).toEqual(['on 60', 'on 62', 'off 60', 'off 62']);
     key('keyup', 'KeyA');
+    expect(events).toHaveLength(4);
+  });
+
+  it('releaseAll emits off for every held key and forgets them', () => {
+    const { input, events, key } = setup();
+    key('keydown', 'KeyA');
+    key('keydown', 'KeyS');
+    input.releaseAll();
+    expect(events).toEqual(['on 60', 'on 62', 'off 60', 'off 62']);
+    key('keyup', 'KeyA');
+    input.releaseAll();
     expect(events).toHaveLength(4);
   });
 

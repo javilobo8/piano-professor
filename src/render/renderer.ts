@@ -37,11 +37,7 @@ export interface Geometry {
 export function geometry(width: number, height: number, whiteWidth: number): Geometry {
   const keyboardHeight = Math.round(Math.min(height * 0.26, Math.max(height * 0.14, whiteWidth * 5)));
   const keyboardTop = height - keyboardHeight;
-  return {
-    keyboardTop,
-    keyboardHeight,
-    pxPerSecond: keyboardTop / VISIBLE_SECONDS,
-  };
+  return { keyboardTop, keyboardHeight, pxPerSecond: keyboardTop / VISIBLE_SECONDS };
 }
 
 /** Index range [from, to) of notes visible at songTime. */
@@ -191,6 +187,8 @@ export interface FreePlayFrameInput {
   noteLabel: ((pitch: number) => string) | null;
 }
 
+const NO_KEYS: ReadonlySet<number> = new Set();
+
 /** Hand colour by side of middle C: below 60 → 'left', 60 and up → 'right'. */
 export function freePlaySide(pitch: number): 'left' | 'right' {
   return pitch < 60 ? 'left' : 'right';
@@ -227,5 +225,5 @@ export function drawFreePlayFrame(ctx: CanvasRenderingContext2D, input: FreePlay
   ctx.globalAlpha = 1;
 
   drawHitLine(ctx, width, g);
-  drawKeyboard(ctx, layout, pressed, new Set(), g);
+  drawKeyboard(ctx, layout, pressed, NO_KEYS, g);
 }

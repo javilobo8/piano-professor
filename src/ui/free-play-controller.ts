@@ -18,6 +18,10 @@ export class FreePlayController {
   private cssWidth = 0;
   private cssHeight = 0;
   private heldKey = '';
+  private input: KeyboardInput | null = null;
+  /** On-screen / PC-keyboard sources holding each pitch. */
+  private local = new Map<number, number>();
+  private firstNoteSeen = false;
   private cleanups: Array<() => void> = [];
 
   constructor(
@@ -25,13 +29,24 @@ export class FreePlayController {
     private readonly connection: ConnectionManager,
     private noteLabel: ((pitch: number) => string) | null,
     private readonly onHeldChange: (held: number[]) => void,
+    private readonly onFirstNote: () => void,
   ) {}
 
   start(): void {
     this.cleanups.push(
       this.connection.onNote((e) => {
-        if (e.type === 'on') this.trail.noteOn(e.pitch, e.velocity, e.timeMs);
+        // A pitch held on screen is already shown; the same note coming back is an echo.
+        if (this.local.has(e.pitch)) return;
+        if (e.type === 'on') this.noteOn(e.pitch, e.velocity, e.timeMs);
         else this.trail.noteOff(e.pitch, e.timeMs);
+      }),
+    );
+    // A dropped link never delivers the note-offs: release what the piano was holding.
+    this.cleanups.push(
+      this.connection.subscribe((status) => {
+        if (status.state === 'connected') return;
+        const now = performance.now();
+        for (const pitch of this.trail.held()) if (!this.local.has(pitch)) this.trail.noteOff(pitch, now);
       }),
     );
     const resize = new ResizeObserver(() => this.resize());
@@ -42,9 +57,10 @@ export class FreePlayController {
       () => (this.layout ? { layout: this.layout, cssWidth: this.cssWidth, cssHeight: this.cssHeight } : null),
       (type, pitch) => this.touch(type, pitch),
     );
+    this.input = input;
     this.cleanups.push(input.attach());
     // Leaving or closing the app must not leave notes hanging on the piano.
-    const onPageHide = () => this.connection.send({ type: 'allNotesOff' });
+    const onPageHide = () => this.releaseAll();
     window.addEventListener('pagehide', onPageHide);
     this.cleanups.push(() => window.removeEventListener('pagehide', onPageHide));
     this.resize();
@@ -59,6 +75,14 @@ export class FreePlayController {
     cancelAnimationFrame(this.frame);
     for (const cleanup of this.cleanups) cleanup();
     this.cleanups = [];
+    this.input = null;
+    this.connection.send({ type: 'allNotesOff' });
+  }
+
+  /** Lets go of everything: on-screen input, the trail and the piano's sounding notes. */
+  releaseAll(): void {
+    this.input?.releaseAll();
+    this.trail.releaseAll(performance.now());
     this.connection.send({ type: 'allNotesOff' });
   }
 
@@ -66,14 +90,32 @@ export class FreePlayController {
     this.noteLabel = noteLabel;
   }
 
-  /** Touch and PC-keyboard notes: shown like any other and sounded on the piano. */
+  /** Touch and PC-keyboard notes: shown on the trail and sounded on the piano (not echoed back). */
   private touch(type: 'on' | 'off', pitch: number): void {
-    this.connection.emitVirtual({ type, pitch, velocity: TOUCH_VELOCITY, timeMs: performance.now() });
+    const count = this.local.get(pitch) ?? 0;
+    const now = performance.now();
     if (type === 'on') {
+      this.local.set(pitch, count + 1);
+      if (count > 0) return;
+      this.noteOn(pitch, TOUCH_VELOCITY, now);
       this.connection.send({ type: 'noteOn', pitch, velocity: Math.round(TOUCH_VELOCITY * 127) });
     } else {
+      if (count === 0) return;
+      if (count > 1) {
+        this.local.set(pitch, count - 1);
+        return;
+      }
+      this.local.delete(pitch);
+      this.trail.noteOff(pitch, now);
       this.connection.send({ type: 'noteOff', pitch });
     }
+  }
+
+  private noteOn(pitch: number, velocity: number, timeMs: number): void {
+    this.trail.noteOn(pitch, velocity, timeMs);
+    if (this.firstNoteSeen) return;
+    this.firstNoteSeen = true;
+    this.onFirstNote();
   }
 
   private resize(): void {

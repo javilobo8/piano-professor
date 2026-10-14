@@ -47,7 +47,8 @@ export class KeyboardInput {
     };
   }
 
-  private releaseAll = (): void => {
+  /** Emits 'off' for every held pointer and PC key and forgets them. */
+  releaseAll = (): void => {
     const pitches = [...this.pcHeld.values(), ...this.pointers.values()];
     this.pcHeld.clear();
     this.pointers.clear();

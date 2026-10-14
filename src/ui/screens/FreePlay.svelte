@@ -14,7 +14,6 @@
 
   function onHeldChange(next: number[]) {
     held = next;
-    if (next.length > 0) played = true;
   }
 
   async function requestWakeLock() {
@@ -32,11 +31,18 @@
 
   function onVisibility() {
     if (document.visibilityState === 'visible') void requestWakeLock();
+    else controller?.releaseAll();
   }
 
   onMount(() => {
     if (!canvas) return;
-    const created = new FreePlayController(canvas, connection, (p: number) => $nameNote(p, false), onHeldChange);
+    const created = new FreePlayController(
+      canvas,
+      connection,
+      (p: number) => $nameNote(p, false),
+      onHeldChange,
+      () => (played = true),
+    );
     created.start();
     controller = created;
     void requestWakeLock();
