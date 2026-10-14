@@ -28,6 +28,8 @@ export class FreePlayController {
   /** On-screen / PC-keyboard sources holding each pitch. */
   private readonly local = new LocalNotes();
   private firstNoteSeen = false;
+  /** The view last saved (or loaded), so an unchanged view is not saved again. */
+  private committed: FreePlayView;
   private cleanups: Array<() => void> = [];
 
   constructor(
@@ -42,6 +44,7 @@ export class FreePlayController {
     this.viewport = new Viewport(PIANO_LOW, PIANO_HIGH, view.zoom);
     this.viewport.centerOn(view.zoom.center);
     this.viewReporter = new ViewReporter(view.onChange);
+    this.committed = view.zoom;
   }
 
   start(): void {
@@ -171,8 +174,14 @@ export class FreePlayController {
     if (changed) this.viewReporter.report(this.viewport);
   }
 
+  /** Saves the view, unless it is what was last saved. */
   private commitView(): void {
-    this.view.onCommit({ ...this.viewport.zoom(), center: this.viewport.centerPitch() });
+    const { whiteKeys, seconds } = this.viewport.zoom();
+    const center = this.viewport.centerPitch();
+    const last = this.committed;
+    if (whiteKeys === last.whiteKeys && seconds === last.seconds && center === last.center) return;
+    this.committed = { whiteKeys, seconds, center };
+    this.view.onCommit(this.committed);
   }
 
   private draw(): void {

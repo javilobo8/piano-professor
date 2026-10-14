@@ -70,10 +70,15 @@
     opacity: 0.7;
     transition: opacity 0.15s;
   }
-  .view-controls:hover,
   .view-controls:focus-within,
   .view-controls:active {
     opacity: 1;
+  }
+  /* Only where hovering is real: a tap on a touch screen would leave the panel opaque. */
+  @media (hover: hover) {
+    .view-controls:hover {
+      opacity: 1;
+    }
   }
   .row {
     display: flex;

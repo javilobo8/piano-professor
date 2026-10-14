@@ -36,8 +36,10 @@ export class PlayController {
   private readonly viewReporter: ViewReporter;
   /** While zoomed, the view scrolls by itself to the next notes (until the player drags it). */
   private following = true;
-  /** The first follow jumps straight to the notes instead of gliding there. */
+  /** When Play opens zoomed, the first follow jumps straight to the notes instead of gliding there. */
   private snapFollow = true;
+  /** The zoom last saved (or loaded), so an unchanged view is not saved again. */
+  private committed: ViewZoom;
   private lastFrameMs = 0;
   private cssWidth = 0;
   private cssHeight = 0;
@@ -67,6 +69,7 @@ export class PlayController {
     const range = this.keyRange();
     this.viewport = new Viewport(range.low, range.high, view.zoom);
     this.viewReporter = new ViewReporter(view.onChange);
+    this.committed = view.zoom;
   }
 
   start(): void {
@@ -84,7 +87,7 @@ export class PlayController {
     const input = new KeyboardInput(this.canvas, surface, (type, pitch) => this.virtual(type, pitch));
     this.cleanups.push(input.attach());
     const gestures = new ViewGestures(this.canvas, surface, {
-      zoomKeys: (factor, anchorX) => this.viewChanged(this.viewport.zoomKeys(factor, anchorX)),
+      zoomKeys: (factor, anchorX) => this.keysChanged(this.viewport.zoomKeys(factor, anchorX)),
       zoomTime: (factor) => this.viewChanged(this.viewport.zoomTime(factor)),
       pan: (dx) => {
         if (!this.viewport.zoomed) return;
@@ -92,7 +95,7 @@ export class PlayController {
         this.following = false;
         this.reportView();
       },
-      commit: () => this.view.onCommit(this.viewport.zoom()),
+      commit: () => this.commitView(),
     });
     this.cleanups.push(gestures.attach());
     // Leaving or closing the app must not leave notes hanging on the piano.
@@ -137,14 +140,14 @@ export class PlayController {
 
   /** Zoom buttons: 1 zooms in (wider keys), -1 out. */
   zoomKeys(direction: 1 | -1): void {
-    this.viewChanged(this.viewport.zoomKeys(direction === 1 ? 1 / ZOOM_STEP : ZOOM_STEP, this.cssWidth / 2));
-    this.view.onCommit(this.viewport.zoom());
+    this.keysChanged(this.viewport.zoomKeys(direction === 1 ? 1 / ZOOM_STEP : ZOOM_STEP, this.cssWidth / 2));
+    this.commitView();
   }
 
   /** Zoom buttons: 1 zooms in (notes further apart), -1 out (more notes ahead). */
   zoomTime(direction: 1 | -1): void {
     this.viewChanged(this.viewport.zoomTime(direction === 1 ? 1 / ZOOM_STEP : ZOOM_STEP));
-    this.view.onCommit(this.viewport.zoom());
+    this.commitView();
   }
 
   /** Back to the whole keyboard at the default seconds. */
@@ -152,7 +155,7 @@ export class PlayController {
     this.viewport.fit();
     this.following = true;
     this.reportView();
-    this.view.onCommit(this.viewport.zoom());
+    this.commitView();
   }
 
   /** Follows the notes again after the player dragged the view away. */
@@ -246,6 +249,21 @@ export class PlayController {
     if (changed) this.reportView();
   }
 
+  /** After a key zoom: back at the whole range there is nothing to scroll, so following starts again. */
+  private keysChanged(changed: boolean): void {
+    if (!changed) return;
+    if (!this.viewport.zoomed) this.following = true;
+    this.reportView();
+  }
+
+  /** Saves the zoom, unless it is what was last saved. */
+  private commitView(): void {
+    const zoom = this.viewport.zoom();
+    if (zoom.whiteKeys === this.committed.whiteKeys && zoom.seconds === this.committed.seconds) return;
+    this.committed = zoom;
+    this.view.onCommit(zoom);
+  }
+
   private reportView(): void {
     this.viewReporter.report(this.viewport, this.viewport.zoomed && !this.following);
   }
@@ -260,6 +278,8 @@ export class PlayController {
   private followNotes(nowMs: number, songTime: number): void {
     const dt = nowMs - this.lastFrameMs;
     this.lastFrameMs = nowMs;
+    // Opened unzoomed: a later first zoom-in glides instead of jumping.
+    if (!this.viewport.zoomed && this.cssWidth > 0) this.snapFollow = false;
     if (!this.following || !this.viewport.zoomed || this.cssWidth === 0) return;
     const roles = this.practiced.size > 0 ? this.practiced : BOTH_HANDS;
     const target = followTarget(this.notes, this.maxDuration, roles, songTime, this.viewport);

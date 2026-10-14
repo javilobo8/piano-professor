@@ -20,8 +20,14 @@ function setup() {
   const layout = layoutKeyboard(21, 108, 520);
   const gestures = new ViewGestures(canvas, () => ({ layout, cssWidth: 520, cssHeight: 600, scrollX: 0 }), handler);
   const detach = gestures.attach();
-  const pointer = (type: string, pointerId: number, clientX: number, clientY: number) => {
-    const event = Object.assign(new Event(type, { cancelable: true }), { pointerId, clientX, clientY });
+  const pointer = (
+    type: string,
+    pointerId: number,
+    clientX: number,
+    clientY: number,
+    init: { pointerType?: string; button?: number } = {},
+  ) => {
+    const event = Object.assign(new Event(type, { cancelable: true }), { pointerId, clientX, clientY, ...init });
     canvas.dispatchEvent(event);
     return event;
   };
@@ -111,6 +117,15 @@ describe('ViewGestures', () => {
     expect(calls).toEqual([['commit'], ['pan', 3]]);
   });
 
+  it('ignores mouse buttons other than the main one', () => {
+    const { calls, pointer } = setup();
+    expect(pointer('pointerdown', 1, 100, 100, { pointerType: 'mouse', button: 2 }).defaultPrevented).toBe(false);
+    pointer('pointermove', 1, 200, 100);
+    pointer('pointerup', 1, 200, 100);
+    expect(calls).toEqual([]);
+    expect(pointer('pointerdown', 2, 100, 100, { pointerType: 'mouse', button: 0 }).defaultPrevented).toBe(true);
+  });
+
   it('ignores a third finger', () => {
     const { calls, pointer } = setup();
     pointer('pointerdown', 1, 100, 100);
@@ -135,7 +150,9 @@ describe('ViewGestures', () => {
     wheel({ shiftKey: true, deltaY: 30 });
     wheel({ deltaX: 40, deltaY: 5 });
     wheel({ deltaMode: 1, deltaY: 3 });
-    expect(calls).toHaveLength(5);
+    // A diagonal swipe that is not clearly sideways zooms the time.
+    wheel({ deltaX: 30, deltaY: 20 });
+    expect(calls).toHaveLength(6);
     expect(calls[0][0]).toBe('zoomKeys');
     expect(calls[0][1]).toBeCloseTo(Math.exp(-0.25));
     expect(calls[0][2]).toBe(50);
@@ -145,6 +162,8 @@ describe('ViewGestures', () => {
     expect(calls[3]).toEqual(['pan', -40]);
     expect(calls[4][0]).toBe('zoomTime');
     expect(calls[4][1]).toBeCloseTo(Math.exp(48 * 0.0025));
+    expect(calls[5][0]).toBe('zoomTime');
+    expect(calls[5][1]).toBeCloseTo(Math.exp(20 * 0.0025));
   });
 
   it('saves 300 ms after the last wheel event', () => {

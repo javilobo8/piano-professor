@@ -70,6 +70,8 @@ export class ViewGestures {
   }
 
   private onPointerDown = (e: PointerEvent): void => {
+    // Only the main mouse button drags; right and middle clicks are left alone.
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
     const surface = this.surface();
     if (!surface || this.points.size >= 2) return;
     const p = this.local(e);
@@ -126,7 +128,8 @@ export class ViewGestures {
     const dy = e.deltaY * scale;
     if (e.ctrlKey) this.handler.zoomKeys(Math.exp(dy * WHEEL_ZOOM), this.local(e).x);
     else if (e.shiftKey) this.handler.pan(-(dx !== 0 ? dx : dy));
-    else if (Math.abs(dx) > Math.abs(dy)) this.handler.pan(-dx);
+    // Only a clearly sideways swipe pans; a diagonal one zooms the time.
+    else if (Math.abs(dx) > 2 * Math.abs(dy)) this.handler.pan(-dx);
     else if (dy !== 0) this.handler.zoomTime(Math.exp(dy * WHEEL_ZOOM));
     if (this.wheelTimer !== null) clearTimeout(this.wheelTimer);
     this.wheelTimer = setTimeout(() => {

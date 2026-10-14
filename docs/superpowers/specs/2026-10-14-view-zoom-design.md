@@ -114,11 +114,13 @@ visibles efectivas, el desplazamiento y los segundos. Expone:
 `scrollX` objetivo, o `null` si no hay que moverse.
 
 1. Candidatas: notas en pantalla (el mismo rango que `visibleRange`) cuyo papel está en
-   `roles`, que no han terminado (`end > songTime`), en orden de inicio. Las que ya suenan
-   van primero.
+   `roles` y que no han terminado (`end > songTime`). Primero las notas que empiezan ahora
+   o después (en orden de inicio), después las que ya suenan, mientras quepan: así una
+   nota que sigue sonando nunca deja fuera de la vista las que hay que tocar.
 2. Se abre un tramo `[izq, der]` con la primera candidata y se amplía con las siguientes
-   mientras `der − izq + 2·margen ≤ viewWidth` (margen = 1 tecla blanca). Se para en la
-   primera que no cabe.
+   mientras `der − izq + 2·margen ≤ viewWidth` (margen = 1 tecla blanca). Cada pasada (las
+   que empiezan, las que ya suenan) se para en la primera que no cabe. Si no empieza
+   ninguna, abre el tramo la primera que ya suena.
 3. Si el tramo ya está dentro de `[scrollX + margen, scrollX + viewWidth − margen]`, no se
    mueve (`null`). Si se sale, se mueve lo mínimo para meterlo. Las notas que empiezan a la
    vez van ordenadas por tono, así que de un acorde más ancho que la vista se ven las más
@@ -127,8 +129,9 @@ visibles efectivas, el desplazamiento y los segundos. Expone:
 `roles` son las manos practicadas. Al escuchar (`practice: 'none'`) son derecha e izquierda.
 El acompañamiento nunca se sigue.
 
-El controlador suaviza: `scrollX += (objetivo − scrollX) · (1 − e^(−dt/150 ms))`. En el
-primer frame salta directo al objetivo.
+El controlador suaviza: `scrollX += (objetivo − scrollX) · (1 − e^(−dt/150 ms))`. Si Tocar
+se abre ya con zoom, el primer seguimiento salta directo al objetivo; el primer zoom a mitad
+de sesión se desliza.
 
 ### 3.4 Renderer (`render/renderer.ts`)
 

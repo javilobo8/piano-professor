@@ -49,6 +49,7 @@ npm run build    # production build in dist/
 Without a piano you can play the on-screen keyboard with touch/mouse, or the PC keyboard:
 `A S D F G H J K L ;` are white keys from C4, `W E T Y U O P` black keys, `Z`/`X` change
 octave.
+
 With a mouse: wheel zooms the time, Ctrl+wheel (or a trackpad pinch) zooms the keys,
 Shift+wheel scrolls sideways, and dragging the notes scrolls too.
 

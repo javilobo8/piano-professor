@@ -49,9 +49,31 @@ describe('followTarget', () => {
     expect(target([pn(60, 0, 1), pn(84, 0.5, 1), pn(36, 1, 1)], view())).toBe(260);
   });
 
-  it('puts notes already sounding first', () => {
-    // C2 started 2 s ago and still sounds; C6 comes next but both do not fit.
-    expect(target([pn(36, -2, 5), pn(84, 0.2, 1)], view())).toBe(160);
+  it('puts the notes starting next before notes already sounding', () => {
+    // C2 started 2 s ago and still sounds; C6 comes next but both do not fit: C6 wins.
+    expect(target([pn(36, -2, 5), pn(84, 0.2, 1)], view())).toBe(260);
+  });
+
+  it('never hides the next note behind one still sounding', () => {
+    // 8 white keys of 65 px centred on C4: view [1267.5, 1787.5]. C2 (x 585) still
+    // sounds; G3 (x 1300) comes next. They do not fit together, so G3 is shown with margin.
+    expect(target([pn(36, -2, 5), pn(55, 0.2, 1)], view(8))).toBe(1235);
+  });
+
+  it('adds notes still sounding while they fit', () => {
+    // C6 comes next and C4 still sounds: both fit, the view moves just enough for C6.
+    expect(target([pn(60, -1, 3), pn(84, 0.2, 1)], view())).toBe(260);
+    // C2 still sounds and C4 comes next (on screen): both fit, so the view moves left for C2.
+    expect(target([pn(36, -1, 3), pn(60, 0.2, 1)], view())).toBe(160);
+  });
+
+  it('follows a note still sounding when nothing new starts', () => {
+    expect(target([pn(36, -2, 5)], view())).toBe(160);
+  });
+
+  it('ignores notes that have already ended', () => {
+    // The long C4 reaches back past C2, which ended a second ago: only C4 counts.
+    expect(target([pn(36, -2, 1), pn(60, -1, 5)], view())).toBeNull();
   });
 
   it('shows the lowest notes of a chord wider than the view', () => {
