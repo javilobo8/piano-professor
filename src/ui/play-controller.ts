@@ -96,10 +96,7 @@ export class PlayController {
         this.reportView();
       },
       scrub: (dy) => this.scrub(dy),
-      endScrub: () => {
-        this.session.endScrub(performance.now());
-        this.flush();
-      },
+      endScrub: () => this.endScrub(),
       commit: () => this.commitView(),
     });
     this.cleanups.push(gestures.attach());
@@ -169,10 +166,17 @@ export class PlayController {
     this.reportView();
   }
 
-  seek(songTime: number): void {
-    this.session.seek(songTime, performance.now());
+  /** Dragging the progress bar: the song follows it, held still and silent until endScrub(). */
+  scrubTo(songTime: number): void {
+    this.session.scrubTo(songTime, performance.now());
     this.flush();
     this.resumeFollowing();
+  }
+
+  /** A drag of the notes or the progress bar ended: the song plays on if it was playing. */
+  endScrub(): void {
+    this.session.endScrub(performance.now());
+    this.flush();
   }
 
   setSpeed(speed: number): void {

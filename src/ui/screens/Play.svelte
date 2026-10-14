@@ -253,13 +253,34 @@
     controller?.setLoop(loop);
   }
 
-  function seekFromBar(event: MouseEvent) {
-    if (!song) return;
-    const bar = event.currentTarget as HTMLElement;
-    const rect = bar.getBoundingClientRect();
+  /** The pointer dragging the progress bar, if any. */
+  let barPointer = $state<number | null>(null);
+
+  function barTime(event: PointerEvent): number {
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     const fraction = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+    return fraction * (song?.duration ?? 0);
+  }
+
+  /** Pressing the progress bar takes the song there; dragging it moves the whole song along. */
+  function barDown(event: PointerEvent) {
+    if (!song || status === 'finished' || barPointer !== null) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    barPointer = event.pointerId;
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
     newRun();
-    controller?.seek(fraction * song.duration);
+    controller?.scrubTo(barTime(event));
+  }
+
+  function barMove(event: PointerEvent) {
+    if (event.pointerId === barPointer) controller?.scrubTo(barTime(event));
+  }
+
+  /** Letting go: the song plays on if it was playing when the drag started. */
+  function barUp(event: PointerEvent) {
+    if (event.pointerId !== barPointer) return;
+    barPointer = null;
+    controller?.endScrub();
   }
 
   function retry() {
@@ -310,7 +331,16 @@
       </div>
 
       <div class="glass cluster center">
-        <div class="seek" role="presentation" onclick={seekFromBar}>
+        <div
+          class="seek"
+          class:dragging={barPointer !== null}
+          role="presentation"
+          onpointerdown={barDown}
+          onpointermove={barMove}
+          onpointerup={barUp}
+          onpointercancel={barUp}
+          onlostpointercapture={barUp}
+        >
           <div class="track">
             <div class="fill" style:transform="translateX({(progress - 1) * 100}%)"></div>
             {#if loopStyle}<div class="loop-zone" style={loopStyle}></div>{/if}
@@ -499,7 +529,8 @@
     display: flex;
     align-items: center;
     cursor: pointer;
-    touch-action: manipulation;
+    /* Dragging along the bar moves the song, so the browser must not take the gesture. */
+    touch-action: none;
   }
   .track {
     position: relative;
@@ -545,6 +576,10 @@
     box-shadow:
       0 0 0 3px rgba(34, 211, 238, 0.28),
       0 2px 6px rgba(0, 0, 0, 0.5);
+    transition: scale 120ms ease;
+  }
+  .dragging .knob {
+    scale: 1.3;
   }
   .time {
     flex: none;

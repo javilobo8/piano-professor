@@ -148,6 +148,24 @@ describe('PracticeSession: scrubbing', () => {
     expect(s.getState().songTime).toBe(4);
   });
 
+  it('drags straight to a song time from the progress bar, within the same bounds', () => {
+    const s = new PracticeSession([pn(60, 0, 1), pn(64, 3, 1)], MEASURES, config(), 0);
+    s.tick(2500);
+    s.drainOutput();
+    s.scrubTo(2.5, 3000);
+    expect(s.getState()).toMatchObject({ status: 'paused', songTime: 2.5 });
+    expect(s.drainOutput()).toEqual([{ type: 'noteOff', pitch: 60 }, { type: 'allNotesOff' }]);
+    s.scrubTo(-100, 3100);
+    expect(s.getState().songTime).toBe(-2);
+    s.scrubTo(100, 3200);
+    expect(s.getState().songTime).toBe(5);
+    s.scrubTo(2.5, 3300);
+    s.endScrub(3300);
+    s.tick(4300);
+    expect(s.getState()).toMatchObject({ status: 'playing', songTime: 3.5 });
+    expect(s.drainOutput()).toEqual([{ type: 'noteOn', pitch: 64, velocity: 102 }]);
+  });
+
   it('stays inside an active loop', () => {
     const s = new PracticeSession([pn(60, 0, 8)], MEASURES, config({ loop: { startMeasure: 1, endMeasure: 1 } }), 0);
     s.scrub(-10, 0);

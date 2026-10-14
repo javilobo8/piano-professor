@@ -173,16 +173,12 @@ export class PracticeSession {
    * endScrub(). The run no longer counts as complete. Does nothing once the run has finished.
    */
   scrub(seconds: number, nowMs: number): void {
-    if (this.scrubResume === null) {
-      this.tick(nowMs);
-      if (this.status === 'finished') return;
-      this.scrubResume = this.status !== 'paused';
-      this.pause(nowMs);
-    }
-    const { min, max } = this.scrubRange();
-    this.pristine = false;
-    // The pause already silenced the piano.
-    this.jumpTo(Math.min(max, Math.max(min, this.songTime + seconds)), false);
+    if (this.holdForScrub(nowMs)) this.scrubJump(this.songTime + seconds);
+  }
+
+  /** Like scrub(), but drags the song straight to song time t (the progress bar). */
+  scrubTo(t: number, nowMs: number): void {
+    if (this.holdForScrub(nowMs)) this.scrubJump(t);
   }
 
   /** The drag ended: the song plays on if it was playing when the drag started. */
@@ -321,6 +317,23 @@ export class PracticeSession {
     const end = loop ? loop.end : Infinity;
     this.wait?.reset(start, end);
     this.tempo?.reset(start, end);
+  }
+
+  /** Holds the song still and silent when a drag starts. False once the run has finished. */
+  private holdForScrub(nowMs: number): boolean {
+    if (this.scrubResume !== null) return true;
+    this.tick(nowMs);
+    if (this.status === 'finished') return false;
+    this.scrubResume = this.status !== 'paused';
+    this.pause(nowMs);
+    return true;
+  }
+
+  private scrubJump(t: number): void {
+    const { min, max } = this.scrubRange();
+    this.pristine = false;
+    // The pause already silenced the piano.
+    this.jumpTo(Math.min(max, Math.max(min, t)), false);
   }
 
   /** Where a drag can take the song: from the lead-in to the end, or within the active loop. */
