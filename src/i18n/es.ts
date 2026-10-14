@@ -60,6 +60,7 @@ export const es: Record<MessageKey, string> = {
   'setup.sound': 'Tocar las otras partes',
   'setup.volume': 'Volumen',
   'setup.listen': 'Escuchar la canción',
+  'setup.listenShort': 'Escuchar',
   'setup.start': 'Empezar',
   'setup.noNotesForHand': 'Esta mano no tiene notas en esta canción.',
 

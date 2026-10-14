@@ -57,6 +57,7 @@ export const en = {
   'setup.sound': 'Play the other parts',
   'setup.volume': 'Volume',
   'setup.listen': 'Listen to the song',
+  'setup.listenShort': 'Listen',
   'setup.start': 'Start',
   'setup.noNotesForHand': 'This hand has no notes in this song.',
 

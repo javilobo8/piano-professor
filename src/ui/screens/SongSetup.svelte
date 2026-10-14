@@ -166,20 +166,22 @@
           <p class="hint">{$t(mode === 'wait' ? 'mode.waitHint' : 'mode.tempoHint')}</p>
         </div>
 
-        <label class="field">
-          <span class="field-head">
-            <span class="label">{$t('setup.speed')}</span>
+        <div class="field">
+          <div class="field-head">
+            <label class="label" for="speed">{$t('setup.speed')}</label>
             <span class="pill value">{speedPercent}%</span>
-          </span>
+          </div>
           <input
+            id="speed"
             type="range"
             min={SPEED_MIN}
             max={SPEED_MAX}
             step="5"
             bind:value={speedPercent}
+            aria-valuetext="{speedPercent}%"
             style:--fill={fill(speedPercent, SPEED_MIN, SPEED_MAX)}
           />
-        </label>
+        </div>
 
         <div class="subsection">
           <h3 class="label subhead"><Volume2 size={16} aria-hidden="true" />{$t('settings.sound')}</h3>
@@ -188,29 +190,37 @@
             <span>{$t('setup.sound')}</span>
             <input type="checkbox" class="switch" role="switch" bind:checked={$settings.soundOn} />
           </label>
-          <label class="field">
-            <span class="field-head">
-              <span class="label">{$t('setup.volume')}</span>
+          <div class="field">
+            <div class="field-head">
+              <label class="label" for="volume">{$t('setup.volume')}</label>
               <span class="pill value">{Math.round($settings.volume * 100)}%</span>
-            </span>
+            </div>
             <input
+              id="volume"
               type="range"
               min="0"
               max="1"
               step="0.05"
               bind:value={$settings.volume}
+              aria-valuetext="{Math.round($settings.volume * 100)}%"
               style:--fill={fill($settings.volume, 0, 1)}
             />
-          </label>
+          </div>
         </div>
 
         {#if !handHasNotes}
           <p class="notice" role="alert"><CircleAlert size={20} aria-hidden="true" />{$t('setup.noNotesForHand')}</p>
         {/if}
 
-        <div class="actions glass">
-          <button onclick={listen} disabled={playable.length === 0}
-            ><Headphones size={20} aria-hidden="true" /><span>{$t('setup.listen')}</span></button
+        <div class="actions">
+          <button
+            onclick={listen}
+            disabled={playable.length === 0}
+            aria-label={$t('setup.listen')}
+            title={$t('setup.listen')}
+            ><Headphones size={20} aria-hidden="true" /><span class="long">{$t('setup.listen')}</span><span
+              class="short">{$t('setup.listenShort')}</span
+            ></button
           >
           <button class="primary" onclick={start} disabled={!handHasNotes}
             ><Play size={20} aria-hidden="true" /><span>{$t('setup.start')}</span></button
@@ -239,16 +249,17 @@
 
         {#if handConfig.method === 'split'}
           <div class="field">
-            <label class="field-head" for="split-point">
-              <span class="label">{$t('setup.splitLabel')}</span>
+            <div class="field-head">
+              <label class="label" for="split-point">{$t('setup.splitLabel')}</label>
               <span class="pill value">{splitNote}</span>
-            </label>
+            </div>
             <input
               id="split-point"
               type="range"
               min={SPLIT_MIN}
               max={SPLIT_MAX}
               value={handConfig.splitPitch}
+              aria-valuetext={splitNote}
               aria-describedby="split-hint"
               style:--fill={fill(draftSplit ?? handConfig.splitPitch, SPLIT_MIN, SPLIT_MAX)}
               oninput={(e) => (draftSplit = Number(e.currentTarget.value))}
@@ -434,21 +445,26 @@
     margin-top: 8px;
   }
 
-  /* ---------- Actions (bottom of the Practice card; a fixed glass bar on phones) ---------- */
+  /*
+   * ---------- Actions ----------
+   * Tall screens from 600 px: a glass footer stuck to the bottom of the Practice card, so Start stays in
+   * view while the card is longer than the screen. Phones and short screens: a fixed glass bar (below).
+   */
 
   .actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
     display: flex;
     justify-content: flex-end;
     gap: 12px;
-    margin-top: 4px;
-    padding: 20px 0 0;
-    border: none;
+    margin: 4px -20px -20px;
+    padding: 16px 20px max(20px, env(safe-area-inset-bottom));
     border-top: 1px solid var(--border);
-    border-radius: 0;
-    background: none;
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-    box-shadow: none;
+    border-radius: 0 0 calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px);
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
   }
   .actions button {
     min-width: 0;
@@ -458,6 +474,9 @@
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
+  }
+  .actions .short {
+    display: none;
   }
   .actions .primary {
     min-width: 160px;
@@ -477,7 +496,8 @@
   }
   .track {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    /* The role column never takes more than half the row; a long role label ellipsises. */
+    grid-template-columns: minmax(0, 1fr) fit-content(50%) auto;
     grid-template-areas: 'name role preview';
     align-items: center;
     gap: 8px 12px;
@@ -538,6 +558,7 @@
 
   .track select {
     grid-area: role;
+    width: 100%;
     min-width: 0;
     min-height: var(--tap-sm);
   }
@@ -591,7 +612,11 @@
     .card {
       gap: 16px;
     }
-    /* Room for the fixed action bar: border + 12 px + button + bottom inset, plus 24 px of air. */
+  }
+
+  /* Phones and short (landscape) screens: the actions float in a fixed glass bar at the bottom. */
+  @media (max-width: 599px), (max-height: 500px) {
+    /* Room for the bar: border + 12 px + button + bottom inset, plus 24 px of air. */
     .screen.with-bar {
       padding-bottom: calc(var(--tap) + 37px + max(12px, env(safe-area-inset-bottom)));
     }
@@ -601,17 +626,21 @@
       bottom: 0;
       left: 0;
       z-index: 10;
+      margin: 0;
+      padding: 12px max(24px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom))
+        max(24px, env(safe-area-inset-left));
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      box-shadow: var(--shadow-pop);
+    }
+  }
+
+  /* Phones: two equal buttons, with the short "Listen" label. */
+  @media (max-width: 599px) {
+    .actions {
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      margin: 0;
-      padding: 12px max(16px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom))
-        max(16px, env(safe-area-inset-left));
-      border-top: 1px solid var(--border);
-      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-      background: var(--glass);
-      -webkit-backdrop-filter: blur(14px);
-      backdrop-filter: blur(14px);
-      box-shadow: var(--shadow-pop);
+      padding-right: max(16px, env(safe-area-inset-right));
+      padding-left: max(16px, env(safe-area-inset-left));
     }
     .actions button {
       padding: 0 12px;
@@ -619,18 +648,21 @@
     .actions .primary {
       min-width: 0;
     }
+    .actions .long {
+      display: none;
+    }
+    .actions .short {
+      display: inline;
+    }
   }
 
-  /* Very narrow: the role select drops under the track name. */
-  @media (max-width: 399px) {
+  /* Narrow: the role select drops under the track name. */
+  @media (max-width: 479px) {
     .track {
       grid-template-columns: minmax(0, 1fr) auto;
       grid-template-areas:
         'name preview'
         'role role';
-    }
-    .track select {
-      width: 100%;
     }
   }
 </style>
