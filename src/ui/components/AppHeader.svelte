@@ -95,6 +95,7 @@
   .name {
     min-width: 0;
     margin: 0;
+    line-height: inherit;
     font-size: 18px;
     font-weight: 800;
     letter-spacing: -0.01em;

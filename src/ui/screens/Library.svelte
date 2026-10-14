@@ -141,6 +141,15 @@
     toggle?.focus();
   }
 
+  /**
+   * Closes the menu when keyboard focus moves to something outside it (and its toggle).
+   * A null target (focus to nothing, e.g. Safari taps) is left to the pointerdown handler.
+   */
+  function closeMenuOnFocusOut(event: FocusEvent) {
+    const next = event.relatedTarget as Node | null;
+    if (next && !(event.currentTarget as Element).contains(next)) menuId = null;
+  }
+
   /** Moves focus into a menu when it opens. */
   function focusFirstItem(node: HTMLElement) {
     node.querySelector('button')?.focus();
@@ -169,10 +178,24 @@
     onchange={onFiles}
   />
 
-  {#if loaded}
-    <section class="featured" class:welcome-card={!(latest && latestSong)}>
+  {#if loaded && songs.length === 0}
+    <section class="featured welcome-card">
       <span class="tile"><Music size={20} aria-hidden="true" /></span>
-      {#if latest && latestSong}
+      <div class="featured-text">
+        <p class="welcome">{$t('library.welcome')}</p>
+      </div>
+      <div class="featured-actions">
+        <button class="primary" onclick={() => fileInput?.click()}
+          ><Plus size={20} aria-hidden="true" />{$t('library.add')}</button
+        >
+        <button onclick={addDemo}><Sparkles size={20} aria-hidden="true" />{$t('library.demo')}</button>
+        <button onclick={openFreePlay}><Piano size={20} aria-hidden="true" />{$t('freePlay.open')}</button>
+      </div>
+    </section>
+  {:else if loaded}
+    {#if latest && latestSong}
+      <section class="featured">
+        <span class="tile"><Music size={20} aria-hidden="true" /></span>
         <div class="featured-text">
           <h2 class="label">{$t('library.continueTitle')}</h2>
           <p class="featured-title" title={latestSong.title}>{latestSong.title}</p>
@@ -182,23 +205,12 @@
           </p>
         </div>
         <div class="featured-actions">
-          <button onclick={openFreePlay}><Piano size={20} aria-hidden="true" />{$t('freePlay.open')}</button>
           <button class="primary" onclick={continuePractice}
             ><Play size={20} aria-hidden="true" />{$t('library.continue')}</button
           >
         </div>
-      {:else}
-        <div class="featured-text">
-          <p class="welcome">{$t('library.welcome')}</p>
-        </div>
-        <div class="featured-actions">
-          <button class="primary" onclick={() => fileInput?.click()}
-            ><Plus size={20} aria-hidden="true" />{$t('library.add')}</button
-          >
-          <button onclick={addDemo}><Sparkles size={20} aria-hidden="true" />{$t('library.demo')}</button>
-        </div>
-      {/if}
-    </section>
+      </section>
+    {/if}
 
     <div class="toolbar">
       <div class="toolbar-title">
@@ -265,7 +277,7 @@
             <div class="song-body" onclick={(e) => onCardClick(e, song.id)}>
               <div class="song-head">
                 <h3 class="song-title" title={song.title}>{song.title}</h3>
-                <div class="more" data-song-menu>
+                <div class="more" data-song-menu onfocusout={closeMenuOnFocusOut}>
                   <button
                     id="more-{song.id}"
                     class="icon ghost"
@@ -389,27 +401,19 @@
     white-space: nowrap;
   }
 
-  /*
-   * Narrow card: the buttons move to their own full-width row under the text (wrapping if they
-   * don't fit). The welcome buttons are wider, so they move earlier.
-   */
-  @container (max-width: 640px) {
+  /* The welcome card's three buttons always sit on their own row under the text. */
+  .welcome-card .featured-actions {
+    grid-column: 1 / -1;
+    flex-wrap: wrap;
+  }
+
+  /* Narrow card: the buttons take a full-width row under the text, sharing it and wrapping if needed. */
+  @container (max-width: 520px) {
     .featured-actions {
       grid-column: 1 / -1;
       flex-wrap: wrap;
     }
     .featured-actions button {
-      flex: 1 1 auto;
-      padding: 0 16px;
-      white-space: normal;
-    }
-  }
-  @container (max-width: 800px) {
-    .welcome-card .featured-actions {
-      grid-column: 1 / -1;
-      flex-wrap: wrap;
-    }
-    .welcome-card .featured-actions button {
       flex: 1 1 auto;
       padding: 0 16px;
       white-space: normal;
@@ -424,7 +428,10 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px 16px;
-    margin: 32px 0 16px;
+    margin: 8px 0 16px;
+  }
+  .featured + .toolbar {
+    margin-top: 32px;
   }
   .toolbar-title {
     display: flex;
@@ -460,6 +467,9 @@
     border-radius: var(--radius);
     background: rgba(248, 113, 113, 0.08);
     color: var(--danger);
+  }
+  .featured + .errors {
+    margin-top: 16px;
   }
   .errors > :global(svg) {
     flex: none;
@@ -669,7 +679,7 @@
       width: 44px;
       height: 44px;
     }
-    .toolbar {
+    .featured + .toolbar {
       margin-top: 24px;
     }
     .toolbar h2 {
